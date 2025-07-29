@@ -1,0 +1,85 @@
+@startuml
+title Send Connection Request
+actor User
+participant ConnectionScreen
+participant ConnectionRouters
+participant AuthMiddleware
+participant ConnectionController
+database Database
+
+User -> ConnectionScreen : 1 : Select user to send friend request
+activate ConnectionScreen
+
+ConnectionScreen -> ConnectionScreen : 2 : Validate selected user
+activate ConnectionScreen
+deactivate ConnectionScreen
+alt Invalid user or same user
+    ConnectionScreen --> User : 2.1 : Show error message
+else Valid user selected
+    ConnectionScreen -> ConnectionRouters : 3 : POST request to /connections
+    activate ConnectionRouters
+
+    ConnectionRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> ConnectionRouters : 4.1 : Return unauthorized error
+        ConnectionRouters --> ConnectionScreen : 4.2 : Return status 401
+        ConnectionScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> ConnectionRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        ConnectionRouters -> ConnectionController : 6 : Call sendFriendRequest function
+        activate ConnectionController
+
+        ConnectionController -> ConnectionController : 7 : Validate toUserId and check not same as fromUserId
+        activate ConnectionController
+        deactivate ConnectionController
+
+        alt Invalid user validation
+            ConnectionController --> ConnectionRouters : 7.1 : Return 400 error
+            ConnectionRouters --> ConnectionScreen : 7.2 : Return status 400
+            ConnectionScreen --> User : 7.3 : Show "Invalid user" message
+        else Valid user
+            ConnectionController -> Database : 8 : Find target user by toUserId
+            activate Database
+            Database --> ConnectionController : 9 : Return user data
+            deactivate Database
+
+            alt User not found
+                ConnectionController --> ConnectionRouters : 9.1 : Return 404 error
+                ConnectionRouters --> ConnectionScreen : 9.2 : Return status 404
+                ConnectionScreen --> User : 9.3 : Show "User not found" message
+            else User found
+                ConnectionController -> ConnectionController : 10 : Check if request already sent
+                activate ConnectionController
+                deactivate ConnectionController
+
+                alt Request already sent
+                    ConnectionController --> ConnectionRouters : 10.1 : Return 400 error
+                    ConnectionRouters --> ConnectionScreen : 10.2 : Return status 400
+                    ConnectionScreen --> User : 10.3 : Show "Request already sent" message
+                else Request not sent yet
+                    ConnectionController -> Database : 11 : Add pending connection to target user
+                    activate Database
+                    Database --> ConnectionController : 12 : Return updated user
+                    deactivate Database
+
+                    ConnectionController -> ConnectionController : 13 : Create connection notification
+                    activate ConnectionController
+                    deactivate ConnectionController
+
+                    ConnectionController --> ConnectionRouters : 14 : Return success message
+                    deactivate ConnectionController
+                    ConnectionRouters --> ConnectionScreen : 15 : Return status 200 and response object
+                    deactivate ConnectionRouters
+                    ConnectionScreen --> User : 16 : Show "Friend request sent" message
+                    deactivate ConnectionScreen
+                end
+            end
+        end
+    end
+end
+
+@enduml

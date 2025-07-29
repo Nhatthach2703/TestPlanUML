@@ -1,0 +1,78 @@
+@startuml
+title View Connection Waiting List
+actor User
+participant ConnectionScreen
+participant UserRouters
+participant AuthMiddleware
+participant UserController
+database Database
+
+User -> ConnectionScreen : 1 : Request to view pending friend requests
+activate ConnectionScreen
+
+ConnectionScreen -> UserRouters : 2 : GET request to /users/getUserById/:userId
+activate UserRouters
+
+UserRouters -> AuthMiddleware : 3 : Verify JWT token
+activate AuthMiddleware
+
+alt Token invalid
+    AuthMiddleware --> UserRouters : 3.1 : Return unauthorized error
+    UserRouters --> ConnectionScreen : 3.2 : Return status 401
+    ConnectionScreen --> User : 3.3 : Show "Unauthorized" message
+else Token valid
+    AuthMiddleware --> UserRouters : 4 : Token verified
+    deactivate AuthMiddleware
+
+    UserRouters -> UserController : 5 : Call getUserById function
+    activate UserController
+
+    UserController -> Database : 6 : Find user by userId with connections
+    activate Database
+    Database --> UserController : 7 : Return user data with connections
+    deactivate Database
+
+    alt User not found
+        UserController --> UserRouters : 7.1 : Return 404 error
+        UserRouters --> ConnectionScreen : 7.2 : Return status 404
+        ConnectionScreen --> User : 7.3 : Show "User not found" message
+    else User found
+        UserController --> UserRouters : 8 : Return user data with connections
+        deactivate UserController
+        UserRouters --> ConnectionScreen : 9 : Return status 200 and user data
+        deactivate UserRouters
+
+        ConnectionScreen -> ConnectionScreen : 10 : Filter connections with status 'pending'
+        activate ConnectionScreen
+        deactivate ConnectionScreen
+
+        ConnectionScreen -> ConnectionScreen : 11 : Extract pending request userIds
+        activate ConnectionScreen
+        deactivate ConnectionScreen
+
+        alt No pending requests
+            ConnectionScreen --> User : 11.1 : Show "No pending requests" message
+            deactivate ConnectionScreen
+        else Has pending requests
+            loop For each pending request userId
+                ConnectionScreen -> UserRouters : 12 : GET request to /users/getUserById/:requesterId
+                activate UserRouters
+                UserRouters -> UserController : 13 : Call getUserById function
+                activate UserController
+                UserController -> Database : 14 : Find requester user details
+                activate Database
+                Database --> UserController : 15 : Return requester user data
+                deactivate Database
+                UserController --> UserRouters : 16 : Return requester user data
+                deactivate UserController
+                UserRouters --> ConnectionScreen : 17 : Return requester user details
+                deactivate UserRouters
+            end
+
+            ConnectionScreen --> User : 18 : Display pending requests list with user details and accept/reject options
+            deactivate ConnectionScreen
+        end
+    end
+end
+
+@enduml

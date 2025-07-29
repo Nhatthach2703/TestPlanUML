@@ -1,0 +1,104 @@
+@startuml
+title Share Travel Plan
+actor User
+participant SharePlanScreen
+participant TravelHistoryRouters
+participant AuthMiddleware
+participant AuthorizeMiddleware
+participant TravelHistoryController
+database Database
+
+User -> SharePlanScreen : 1 : Select users to share plan with
+activate SharePlanScreen
+
+SharePlanScreen -> SharePlanScreen : 2 : Validate selected users
+activate SharePlanScreen
+deactivate SharePlanScreen
+
+alt No users selected
+    SharePlanScreen --> User : 2.1 : Show "Please select users to share" message
+else Users selected
+    SharePlanScreen -> TravelHistoryRouters : 3 : POST request to /travel-history/:id/participants
+    activate TravelHistoryRouters
+
+    TravelHistoryRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> TravelHistoryRouters : 4.1 : Return unauthorized error
+        TravelHistoryRouters --> SharePlanScreen : 4.2 : Return status 401
+        SharePlanScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> TravelHistoryRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        TravelHistoryRouters -> AuthorizeMiddleware : 6 : Check user role
+        activate AuthorizeMiddleware
+
+        alt Role not authorized
+            AuthorizeMiddleware --> TravelHistoryRouters : 6.1 : Return forbidden error
+            TravelHistoryRouters --> SharePlanScreen : 6.2 : Return status 403
+            SharePlanScreen --> User : 6.3 : Show "Access denied" message
+        else Role authorized (user)
+            AuthorizeMiddleware --> TravelHistoryRouters : 7 : Role verified
+            deactivate AuthorizeMiddleware
+
+            TravelHistoryRouters -> TravelHistoryController : 8 : Call addParticipant function
+            activate TravelHistoryController
+
+            TravelHistoryController -> Database : 9 : Find travel history by id
+            activate Database
+            Database --> TravelHistoryController : 10 : Return travel history data
+            deactivate Database
+
+            alt Travel history not found
+                TravelHistoryController --> TravelHistoryRouters : 10.1 : Return 404 error
+                TravelHistoryRouters --> SharePlanScreen : 10.2 : Return status 404
+                SharePlanScreen --> User : 10.3 : Show "Travel history not found" message
+            else Travel history found
+                TravelHistoryController -> TravelHistoryController : 11 : Check if user is creator
+                activate TravelHistoryController
+                deactivate TravelHistoryController
+
+                alt User not authorized to share
+                    TravelHistoryController --> TravelHistoryRouters : 11.1 : Return 403 error
+                    TravelHistoryRouters --> SharePlanScreen : 11.2 : Return status 403
+                    SharePlanScreen --> User : 11.3 : Show "You are not authorized to update this travel history" message
+                else User authorized to share
+                    TravelHistoryController -> Database : 12 : Check if participant exists
+                    activate Database
+                    Database --> TravelHistoryController : 13 : Return participant data
+                    deactivate Database
+
+                    alt Participant not found
+                        TravelHistoryController --> TravelHistoryRouters : 13.1 : Return 404 error
+                        TravelHistoryRouters --> SharePlanScreen : 13.2 : Return status 404
+                        SharePlanScreen --> User : 13.3 : Show "Participant not found" message
+                    else Participant found
+                        TravelHistoryController -> TravelHistoryController : 14 : Check if participant already added
+                        activate TravelHistoryController
+                        deactivate TravelHistoryController
+                        alt Participant already added
+                            TravelHistoryController --> TravelHistoryRouters : 14.1 : Return 400 error
+                            TravelHistoryRouters --> SharePlanScreen : 14.2 : Return status 400
+                            SharePlanScreen --> User : 14.3 : Show "Participant already added to this trip" message
+                        else Participant not added yet
+                            TravelHistoryController -> Database : 15 : Add participant to travel history
+                            activate Database
+                            Database --> TravelHistoryController : 16 : Return updated travel history
+                            deactivate Database
+                            TravelHistoryController --> TravelHistoryRouters : 17 : Return success message and updated data
+                            deactivate TravelHistoryController
+                            deactivate TravelHistoryRouters
+                            TravelHistoryRouters --> SharePlanScreen : 18 : Return status 200 and response object
+                            SharePlanScreen --> User : 19 : Show "Travel plan shared successfully" message
+                            deactivate SharePlanScreen
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+@enduml

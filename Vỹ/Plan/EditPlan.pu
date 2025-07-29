@@ -1,0 +1,92 @@
+@startuml
+title Edit Travel Plan
+actor User
+participant TravelPlanScreen
+participant TravelPlanRouters
+participant AuthMiddleware
+participant AuthorizeMiddleware
+participant TravelPlanController
+database Database
+
+User -> TravelPlanScreen : 1 : Enter updated plan data (plans, destination, dates)
+activate TravelPlanScreen
+
+TravelPlanScreen -> TravelPlanScreen : 2 : Validate input data
+activate TravelPlanScreen
+deactivate TravelPlanScreen
+
+alt Validate wrong
+    TravelPlanScreen --> User : 2.1 : Show error message
+else Validate right
+    TravelPlanScreen -> TravelPlanRouters : 3 : PUT request to /travel-plan/:id
+    activate TravelPlanRouters
+
+    TravelPlanRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> TravelPlanRouters : 4.1 : Return unauthorized error
+        TravelPlanRouters --> TravelPlanScreen : 4.2 : Return status 401
+        TravelPlanScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> TravelPlanRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        TravelPlanRouters -> AuthorizeMiddleware : 6 : Check user role
+        activate AuthorizeMiddleware
+
+        alt Role not authorized
+            AuthorizeMiddleware --> TravelPlanRouters : 6.1 : Return forbidden error
+            TravelPlanRouters --> TravelPlanScreen : 6.2 : Return status 403
+            TravelPlanScreen --> User : 6.3 : Show "Access denied" message
+        else Role authorized (user)
+            AuthorizeMiddleware --> TravelPlanRouters : 7 : Role verified
+            deactivate AuthorizeMiddleware
+
+            TravelPlanRouters -> TravelPlanController : 8 : Call updateTravelPlan function
+            activate TravelPlanController
+
+            TravelPlanController -> Database : 9 : Find travel plan by id to check ownership
+            activate Database
+            Database --> TravelPlanController : 10 : Return travel plan data
+            deactivate Database
+
+            alt Travel plan not found
+                TravelPlanController --> TravelPlanRouters : 10.1 : Return 404 error
+                TravelPlanRouters --> TravelPlanScreen : 10.2 : Return status 404
+                TravelPlanScreen --> User : 10.3 : Show "Travel plan not found" message
+            else Travel plan found
+                TravelPlanController -> TravelPlanController : 11 : Check if user is plan creator
+                activate TravelPlanController
+
+                alt User not authorized to update
+                    TravelPlanController --> TravelPlanRouters : 11.1 : Return 403 error
+                    TravelPlanRouters --> TravelPlanScreen : 11.2 : Return status 403
+                    TravelPlanScreen --> User : 11.3 : Show "You are not authorized to update this travel plan" message
+                    deactivate TravelPlanController
+                else User authorized to update
+                    TravelPlanController -> Database : 12 : Update travel plan with new data
+                    activate Database
+                    Database --> TravelPlanController : 13 : Return updated travel plan
+                    deactivate Database
+
+                    alt Updates include destination/dates
+                        TravelPlanController -> Database : 14 : Update corresponding travel history
+                        activate Database
+                        Database --> TravelPlanController : 15 : Return updated travel history
+                        deactivate Database
+                    end
+
+                    TravelPlanController --> TravelPlanRouters : 16 : Return success message and updated data
+                    deactivate TravelPlanController
+                    TravelPlanRouters --> TravelPlanScreen : 17 : Return status 200 and response object
+                    deactivate TravelPlanRouters
+                    TravelPlanScreen --> User : 18 : Show "Travel plan updated successfully" message
+                    deactivate TravelPlanScreen
+                end
+            end
+        end
+    end
+end
+
+@enduml

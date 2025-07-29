@@ -1,0 +1,72 @@
+@startuml
+' ==== LAYERS ====
+class ConnectionRouter <<Router>>
+class AuthMiddleware <<Middleware>>
+class ConnectionController <<Controller>> {
+  +sendFriendRequest()
+  +acceptFriendRequest()
+  +rejectFriendRequest()
+  +removeFriend()
+  +getConnectionList()
+  +getPendingConnectionList()
+}
+
+' ==== UTILS ====
+class connectionUtils <<Helper/Service>> {
+  +validateConnectionRequest()
+  +checkExistingConnection()
+  +updateConnectionStatus()
+}
+
+class notificationUtils <<Helper/Service>> {
+  +createConnectionNotification()
+  +sendRealtimeNotification()
+}
+
+' ==== MODELS ====
+class User <<Model>> {
+  +fullName: String
+  +email: String
+  +gender: String
+  +dob: Date
+  +job: String
+  +phone: String
+  +address: String
+  +hometown: String
+  +cccd: String
+  +hobbies: String[]
+  +description: String
+  +rate: Number
+  +avatar: { url: String, publicId: String }
+  +coverImage: { url: String, publicId: String }
+  +travelStatus: Boolean
+  +currentLocation: String
+  +payment: String
+  +connections: [{ userId: ObjectId, status: String }]
+  +title: String
+}
+
+class Notification <<Model>> {
+  +userId: User
+  +content: String
+  +type: String
+  +relatedId: ObjectId
+  +relatedModel: String
+  +priority: String
+  +isRead: Boolean
+  +notifyStatus: Boolean
+  +fromUser: User
+  +data: Mixed
+}
+
+' ==== LAYERED FLOW ====
+ConnectionRouter --> AuthMiddleware : use
+AuthMiddleware --> ConnectionController : pass if verified
+ConnectionController --> connectionUtils : call
+ConnectionController --> notificationUtils : call
+connectionUtils --> User : CRUD
+notificationUtils --> Notification : CRUD
+notificationUtils --> User : read
+User "1" o-- "*" User : connections
+
+@enduml

@@ -1,0 +1,77 @@
+@startuml
+title Delete Connection
+actor User
+participant ConnectionScreen
+participant ConnectionRouters
+participant AuthMiddleware
+participant ConnectionController
+database Database
+
+User -> ConnectionScreen : 1 : Select friend to remove
+activate ConnectionScreen
+
+ConnectionScreen -> ConnectionScreen : 2 : Show confirmation dialog
+activate ConnectionScreen
+deactivate ConnectionScreen
+alt User cancels
+    ConnectionScreen --> User : 2.1 : Cancel removal
+else User confirms
+    ConnectionScreen -> ConnectionRouters : 3 : DELETE request to /connections/remove
+    activate ConnectionRouters
+
+    ConnectionRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> ConnectionRouters : 4.1 : Return unauthorized error
+        ConnectionRouters --> ConnectionScreen : 4.2 : Return status 401
+        ConnectionScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> ConnectionRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        ConnectionRouters -> ConnectionController : 6 : Call removeFriend function
+        activate ConnectionController
+
+        ConnectionController -> ConnectionController : 7 : Validate friendId
+        activate ConnectionController
+        deactivate ConnectionController
+
+        alt Invalid friendId
+            ConnectionController --> ConnectionRouters : 7.1 : Return 400 error
+            ConnectionRouters --> ConnectionScreen : 7.2 : Return status 400
+            ConnectionScreen --> User : 7.3 : Show "Invalid friendId" message
+        else Valid friendId
+            ConnectionController -> Database : 8 : Find current user
+            activate Database
+            Database --> ConnectionController : 9 : Return user data
+            deactivate Database
+
+            ConnectionController -> Database : 10 : Remove friendId from user's connections
+            activate Database
+            Database --> ConnectionController : 11 : Return updated user
+            deactivate Database
+
+            ConnectionController -> Database : 12 : Find friend user
+            activate Database
+            Database --> ConnectionController : 13 : Return friend user data
+            deactivate Database
+
+            alt Friend user exists
+                ConnectionController -> Database : 14 : Remove userId from friend's connections
+                activate Database
+                Database --> ConnectionController : 15 : Return updated friend
+                deactivate Database
+            end
+
+            ConnectionController --> ConnectionRouters : 16 : Return success message
+            deactivate ConnectionController
+            ConnectionRouters --> ConnectionScreen : 17 : Return status 200 and response object
+            deactivate ConnectionRouters
+            ConnectionScreen --> User : 18 : Show "Friend removed successfully" message
+            deactivate ConnectionScreen
+        end
+    end
+end
+
+@enduml

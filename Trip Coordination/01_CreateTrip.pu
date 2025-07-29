@@ -1,0 +1,59 @@
+@startuml
+' Sequence diagram: Create a new trip (TravelHistory) from chat room
+' Flow: FE calls POST /chat/:id/travelhistory -> controller -> model -> socket -> return result
+
+title Create Trip
+
+actor User
+participant TripCreateScreen
+participant travelHistoryRouters
+participant chatController
+participant chatUtils
+participant SocketIOServer
+Database Database
+
+User -> TripCreateScreen : 1. Enter trip info (destinatSocketIOServern, arrivalDate, returnDate, plan)
+activate TripCreateScreen
+TripCreateScreen -> TripCreateScreen : 2. Validate input
+activate TripCreateScreen
+deactivate TripCreateScreen
+alt Input invalid
+    TripCreateScreen --> User : 3.1. Show validatSocketIOServern error
+
+else Input valid
+    TripCreateScreen -> travelHistoryRouters : 3. POST /chat/:id/travelhistory (body: destinatSocketIOServern, arrivalDate, returnDate, plan)
+    activate travelHistoryRouters
+
+    travelHistoryRouters -> chatController : 4. Call createTravelHistory
+    activate chatController
+
+    chatController -> Database : 5. Query chatRoom by id
+    activate Database
+    Database --> chatController : 6. Return chatRoom data
+    deactivate Database
+
+    chatController -> Database : 7. Insert new TravelHistory (creatorId, plan, participants, destinatSocketIOServern, arrivalDate, returnDate, status, notes, expenses)
+    activate Database
+    Database --> chatController : 8. Return created travelHistory
+    deactivate Database
+
+    chatController -> chatUtils : 9. Create system message (travelHistoryCreated)
+    activate chatUtils
+    chatUtils --> chatController : 10. Return systemMessageData
+    deactivate chatUtils
+
+    chatController -> SocketIOServer : 11. Emit socket event to participants (newMessage, travelHistoryCreated, chatListUpdate)
+    activate SocketIOServer
+    ' SocketIOServer --> chatController : 12. Confirm emit success
+    deactivate SocketIOServer
+
+    chatController --> travelHistoryRouters : 12. Return response 201 + travelHistory
+    deactivate chatController
+
+    travelHistoryRouters --> TripCreateScreen : 13. Return result 
+    deactivate travelHistoryRouters
+    TripCreateScreen --> User : 15. Show result
+    deactivate TripCreateScreen
+end
+
+@enduml

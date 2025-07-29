@@ -1,0 +1,46 @@
+@startuml
+title View Chat Room List
+
+actor User
+participant ChatScreen
+participant ChatRoutes
+participant AuthMiddleware
+participant ChatController
+participant ChatUtils
+database Database
+
+User -> ChatScreen : 1. Open chat list UI
+activate ChatScreen
+ChatScreen -> ChatRoutes : 2. GET / (with JWT token)
+activate ChatRoutes
+ChatRoutes -> AuthMiddleware : 3. verifyToken & authorizeRole('user')
+activate AuthMiddleware
+AuthMiddleware --> ChatRoutes : 4. Pass if valid
+deactivate AuthMiddleware
+
+ChatRoutes -> ChatController : 5. Call getChatRooms
+activate ChatController
+ChatController -> ChatUtils : 6. getChatRoomsWithLastMessage(userId)
+activate ChatUtils
+ChatUtils -> Database : 7. Find ChatRooms by userId
+activate Database
+Database --> ChatUtils : 8. Return ChatRooms
+deactivate Database
+
+loop For each ChatRoom
+    ChatUtils -> Database : 9. Find last Message by chatRoomId
+    activate Database
+    Database --> ChatUtils : 10. Return last Message
+    deactivate Database
+end
+
+ChatUtils --> ChatController : 11. Return chatRoomsWithLastMessage
+deactivate ChatUtils
+ChatController --> ChatRoutes : 12. Return 200 + data
+deactivate ChatController
+ChatRoutes --> ChatScreen : 13. Return chatroom list
+deactivate ChatRoutes
+ChatScreen --> User : 14. Display chatroom list
+deactivate ChatScreen
+
+@enduml

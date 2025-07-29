@@ -1,0 +1,77 @@
+@startuml
+title Leave Chat Room
+
+actor User
+participant ChatScreen
+participant ChatRoutes
+participant ChatController
+participant ChatUtils
+participant SocketIOServer
+database Database
+
+User -> ChatScreen : 1. Click "Leave chatroom"
+activate ChatScreen
+ChatScreen -> ChatRoutes : 2. POST /chat/:id/leave
+activate ChatRoutes
+ChatRoutes -> ChatController : 3. Call leaveChatRoom
+activate ChatController
+
+ChatController -> Database : 4. Find ChatRoom by id
+activate Database
+Database --> ChatController : 5. Return ChatRoom
+deactivate Database
+
+ChatController -> ChatUtils : 6. validateChatRoomPermissions
+activate ChatUtils
+ChatUtils --> ChatController : 7. Return validation result
+deactivate ChatUtils
+
+ChatController -> ChatController : 8. check validate chatroom data
+activate ChatController
+deactivate ChatController
+
+alt Not allowed (not a participant, is creator, etc.)
+    ChatController --> ChatRoutes : 9. Return error
+    ChatRoutes --> ChatScreen : 10. Return error
+    ChatScreen --> User : 11. Show error message
+else Allowed
+    ChatController -> Database : 9. Remove user from participants, save ChatRoom
+    activate Database
+    Database --> ChatController : 10. Return updated ChatRoom
+    deactivate Database
+
+    ChatController -> ChatUtils : 11. createSystemMessage (userLeftChatroom)
+    activate ChatUtils
+    ChatUtils --> ChatController : 12. Return systemMessageData
+    deactivate ChatUtils
+
+    ChatController -> SocketIOServer : 13. Emit "newMessage" (system) to chatroom
+    activate SocketIOServer
+    deactivate SocketIOServer
+
+    loop for each remaining participant
+        ChatController -> SocketIOServer : 14. Emit "participantLeft" to user_{participant}
+        activate SocketIOServer
+        deactivate SocketIOServer
+    end
+
+    ChatController -> ChatUtils : 15. emitChatListUpdate (update chat list)
+    activate ChatUtils
+    ChatUtils -> SocketIOServer : 16. Emit "chatListUpdate" to remaining participants
+    activate SocketIOServer
+    deactivate SocketIOServer
+    deactivate ChatUtils
+
+    ChatController -> SocketIOServer : 17. Emit "chatRoomLeft" to the user who left
+    activate SocketIOServer
+    deactivate SocketIOServer
+
+    ChatController --> ChatRoutes : 18. Return success
+    deactivate ChatController
+    ChatRoutes --> ChatScreen : 19. Return success
+    deactivate ChatRoutes
+    ChatScreen --> User : 20. Show left chatroom
+    deactivate ChatScreen
+end
+
+@enduml

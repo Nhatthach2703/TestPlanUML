@@ -1,0 +1,46 @@
+@startuml
+' Sequence diagram: Edit an existing trip
+' Flow: FE calls PUT /travelhistory/:id -> controller -> model -> return result
+
+title Edit Trip
+
+actor User
+participant TripEditScreen
+participant travelHistroyRouters
+participant travelHistoryController
+Database Database
+
+User -> TripEditScreen : 1. Edit trip info (destination, arrivalDate, returnDate, status)
+activate TripEditScreen
+TripEditScreen -> travelHistroyRouters : 2. PUT /travelhistory/:id (body: destination, arrivalDate, returnDate, status, plan)
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call updateTravelHistory
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trip by id
+activate Database
+Database --> travelHistoryController : 5. Return trip or null
+deactivate Database
+travelHistoryController -> travelHistoryController : 6. Validate trip
+activate travelHistoryController
+deactivate travelHistoryController
+
+alt If trip found & user is creator
+    travelHistoryController -> Database : 7. Update fields (destination, arrivalDate, returnDate, status, plan)
+    activate Database
+    Database --> travelHistoryController : 8. Return updated trip
+    deactivate Database
+
+    travelHistoryController --> travelHistroyRouters : 9. Return response 200 + updated trip
+else If not found or unauthorized
+    travelHistoryController --> travelHistroyRouters : 9.1. Return error 404/403
+    deactivate travelHistoryController
+end
+
+travelHistroyRouters --> TripEditScreen : 10. Return result (success/error)
+deactivate travelHistroyRouters
+TripEditScreen --> User : 11. Show result
+deactivate TripEditScreen
+
+@enduml

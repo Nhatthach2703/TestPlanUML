@@ -1,0 +1,80 @@
+@startuml
+' ==== CONTROLLER & ROUTER LAYER ====
+class TravelPlanRouter <<Router>> {
+  +createTravelPlan()
+  +updateTravelPlan()
+  +deleteTravelPlan()
+  +getTravelPlanById()
+}
+class TravelPlanController <<Controller>> {
+  +createTravelPlan()
+  +updateTravelPlan()
+  +deleteTravelPlan()
+  +getTravelPlanById()
+  +shareTravelPlan()
+}
+
+' ==== DOMAIN MODELS ====
+class TravelPlan <<Model>> {
+  +userId: ObjectId
+  +shareWith: ObjectId[]
+  +title: String
+  +destination: String
+  +arrivalDate: Date
+  +returnDate: Date
+  +plans: Plan[]
+}
+
+class TravelHistory <<Model>> {
+  +travelPlanId: TravelPlan
+  +participants: User[*]
+  +createdBy: User
+}
+
+class User <<Model>> {
+  +userId: ObjectId
+  +fullName: String
+  +email: String
+  +gender: String
+  +dob: Date
+  +job: String
+  +phone: String
+  +address: String
+  +hometown: String
+  +cccd: String
+  +hobbies: String[]
+  +description: String
+  +rate: Number
+  +avatar: { url: String, publicId: String }
+  +coverImage: { url: String, publicId: String }
+  +travelStatus: Boolean
+  +currentLocation: String
+  +payment: String
+  +connections: [{ userId: ObjectId, status: String }]
+  +title: String
+}
+
+class Plan {
+  +activityName: String
+  +description: String
+  +location: String
+  +price: Number
+  +date: Date
+  +startTime: String
+  +endTime: String
+  +note: String
+}
+
+' ==== RELATIONSHIPS ====
+TravelPlanRouter --> TravelPlanController : call
+
+TravelPlanController --> TravelPlan : CRUD
+TravelPlanController --> TravelHistory : CRUD
+
+TravelPlan --> User : createdBy
+TravelHistory --> TravelPlan : travelPlanId
+TravelHistory --> User : participants, createdBy
+
+TravelPlan "1" o-- "*" Plan : contains
+
+@enduml

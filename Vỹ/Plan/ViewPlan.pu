@@ -1,0 +1,54 @@
+@startuml
+title View Travel Plan
+actor User
+participant TravelPlanScreen
+participant TravelPlanRouters
+participant AuthMiddleware
+participant TravelPlanController
+database Database
+
+User -> TravelPlanScreen : 1 : Request to view travel plan
+activate TravelPlanScreen
+
+TravelPlanScreen -> TravelPlanRouters : 2 : GET request to /travel-plan/:id
+activate TravelPlanRouters
+
+TravelPlanRouters -> AuthMiddleware : 3 : Verify JWT token
+activate AuthMiddleware
+
+alt Token invalid
+    AuthMiddleware --> TravelPlanRouters : 3.1 : Return unauthorized error
+    TravelPlanRouters --> TravelPlanScreen : 3.2 : Return status 401
+    TravelPlanScreen --> User : 3.3 : Show "Unauthorized" message
+else Token valid
+    AuthMiddleware --> TravelPlanRouters : 4 : Token verified
+    deactivate AuthMiddleware
+
+    TravelPlanRouters -> TravelPlanController : 5 : Call getTravelPlanById function
+    activate TravelPlanController
+
+    TravelPlanController -> Database : 6 : Query travel plan by id with populate userId
+    activate Database
+    Database --> TravelPlanController : 7 : Return travel plan data
+    deactivate Database
+
+    alt Travel plan not found
+        TravelPlanController --> TravelPlanRouters : 7.1 : Return 404 error
+        TravelPlanRouters --> TravelPlanScreen : 7.2 : Return status 404
+        TravelPlanScreen --> User : 7.3 : Show "Travel plan not found" message
+    else Travel plan found
+        TravelPlanController -> Database : 8 : Query travel history by plan id
+        activate Database
+        Database --> TravelPlanController : 9 : Return travel history data
+        deactivate Database
+        deactivate TravelPlanController
+        TravelPlanController --> TravelPlanRouters : 10 : Return travel plan and history data
+        deactivate TravelPlanController
+        TravelPlanRouters --> TravelPlanScreen : 11 : Return status 200 and plan data
+        deactivate TravelPlanRouters
+        TravelPlanScreen --> User : 12 : Display travel plan details (plans, destination, dates)
+        deactivate TravelPlanScreen
+    end
+end
+
+@enduml

@@ -1,0 +1,54 @@
+@startuml
+' Sequence diagram: Add Note in Trip
+' Flow: FE calls POST /travelhistory/:id/notes -> router -> controller -> model -> return result
+
+title Add Note in Trip
+
+actor User
+participant TripNoteScreen
+participant travelHistroyRouters
+participant travelHistoryController
+participant cloudinaryUtils
+Database Database
+
+User -> TripNoteScreen : 1. Enter note, select images (if any)
+activate TripNoteScreen
+TripNoteScreen -> travelHistroyRouters : 2. POST /travelhistory/:id/notes (body: text, images?)
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call addTravelNote (after authentication, image upload)
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trip by id
+activate Database
+Database --> travelHistoryController : 5. Return trip or null
+deactivate Database
+
+travelHistoryController -> travelHistoryController : 6. Check permission (creator/participant)
+activate travelHistoryController
+deactivate travelHistoryController
+
+alt If valid
+    alt Has images
+        travelHistoryController -> cloudinaryUtils : 7. Call uploadFilesToCloudinary(images, folder, 'image')
+        activate cloudinaryUtils
+        cloudinaryUtils --> travelHistoryController : 8. Return uploaded image info
+        deactivate cloudinaryUtils
+    end
+    travelHistoryController -> Database : 9. Add new note to trip
+    activate Database
+    Database --> travelHistoryController : 10. Return updated trip
+    deactivate Database
+
+    travelHistoryController --> travelHistroyRouters : 11. Return response 201 + new note
+else If not valid
+    travelHistoryController --> travelHistroyRouters : 7.1. Return error 403/404
+    deactivate travelHistoryController
+end
+
+travelHistroyRouters --> TripNoteScreen : 12. Return result (success/error)
+deactivate travelHistroyRouters
+TripNoteScreen --> User : 13. Show result (success/failure)
+deactivate TripNoteScreen
+
+@enduml

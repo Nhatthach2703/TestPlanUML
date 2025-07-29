@@ -1,0 +1,88 @@
+@startuml
+title Create Travel Plan
+actor User
+participant TravelPlanScreen
+participant TravelPlanRouters
+participant AuthMiddleware
+participant AuthorizeMiddleware
+participant TravelPlanController
+database Database
+
+User -> TravelPlanScreen : 1 : Enter travel plan data (plans, destination, arrivalDate, returnDate)
+activate TravelPlanScreen
+
+TravelPlanScreen -> TravelPlanScreen : 2 : Validate input data
+activate TravelPlanScreen
+deactivate TravelPlanScreen
+alt Validate wrong
+    TravelPlanScreen --> User : 2.1 : Show error message
+else Validate right
+    TravelPlanScreen -> TravelPlanRouters : 3 : POST request to /travel-plan
+    activate TravelPlanRouters
+
+    TravelPlanRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> TravelPlanRouters : 4.1 : Return unauthorized error
+        TravelPlanRouters --> TravelPlanScreen : 4.2 : Return status 401
+        TravelPlanScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> TravelPlanRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        TravelPlanRouters -> AuthorizeMiddleware : 6 : Check user role
+        activate AuthorizeMiddleware
+
+        alt Role not authorized
+            AuthorizeMiddleware --> TravelPlanRouters : 6.1 : Return forbidden error
+            TravelPlanRouters --> TravelPlanScreen : 6.2 : Return status 403
+            TravelPlanScreen --> User : 6.3 : Show "Access denied" message
+        else Role authorized (user)
+            AuthorizeMiddleware --> TravelPlanRouters : 7 : Role verified
+            deactivate AuthorizeMiddleware
+
+            TravelPlanRouters -> TravelPlanController : 8 : Call createTravelPlan function
+            activate TravelPlanController
+
+            TravelPlanController -> TravelPlanController : 9 : Validate return date >= arrival date
+            activate TravelPlanController
+            deactivate TravelPlanController
+
+            alt Date validation failed
+                TravelPlanController --> TravelPlanRouters : 9.1 : Return 400 error
+                TravelPlanRouters --> TravelPlanScreen : 9.2 : Return status 400
+                TravelPlanScreen --> User : 9.3 : Show "Return date must be greater than or equal to arrival date" message
+            else Date validation passed
+                TravelPlanController -> TravelPlanController : 10 : Validate start time <= end time for each plan
+                activate TravelPlanController
+                deactivate TravelPlanController
+                alt Time validation failed
+                    TravelPlanController --> TravelPlanRouters : 10.1 : Return 400 error
+                    TravelPlanRouters --> TravelPlanScreen : 10.2 : Return status 400
+                    TravelPlanScreen --> User : 10.3 : Show "Start time cannot be later than end time" message
+                else Time validation passed
+                    TravelPlanController -> Database : 11 : Create new travel plan
+                    activate Database
+                    Database --> TravelPlanController : 12 : Return created travel plan
+                    deactivate Database
+
+                    TravelPlanController -> Database : 13 : Create corresponding travel history
+                    note right : Using TravelPlan ID as reference\nand userId as first participant
+                    activate Database
+                    Database --> TravelPlanController : 14 : Return created travel history
+                    deactivate Database
+
+                    TravelPlanController --> TravelPlanRouters : 15 : Return success message with both data
+                    deactivate TravelPlanController
+                    TravelPlanRouters --> TravelPlanScreen : 16 : Return status 201 and response object
+                    deactivate TravelPlanRouters
+                    TravelPlanScreen --> User : 17 : Show "Travel plan and history created successfully" message
+                    deactivate TravelPlanScreen
+                end
+            end
+        end
+    end
+end
+
+@enduml

@@ -1,0 +1,84 @@
+@startuml
+' ==== LAYERS ====
+class RatingRouter <<Router>>
+class ReportRouter <<Router>>
+class AuthMiddleware <<Middleware>>
+class RatingController <<Controller>> {
+  +createRating()
+  +getRatingsByUser()
+}
+class ReportController <<Controller>> {
+  +createReport()
+  +getReportsByUser()
+}
+
+' ==== MODELS ====
+class Rating <<Model>> {
+  +userRated: User
+  +userIsRated: User
+  +ratingValue: Number
+  +travelHistoryId: TravelHistory
+  +createdAt: Date
+  +updatedAt: Date
+}
+class Report <<Model>> {
+  +userReported: User
+  +userIsReported: User
+  +titleReport: String
+  +description: String
+  +travelHistoryId: TravelHistory
+  +createdAt: Date
+  +updatedAt: Date
+}
+class User <<Model>> {
+  +userId: ObjectId
+  +fullName: String
+  +email: String
+  +gender: String
+  +dob: Date
+  +job: String
+  +phone: String
+  +address: String
+  +hometown: String
+  +cccd: String
+  +hobbies: String[]
+  +description: String
+  +rate: Number
+  +avatar: { url: String, publicId: String }
+  +coverImage: { url: String, publicId: String }
+  +travelStatus: Boolean
+  +currentLocation: String
+  +payment: String
+  +connections: [{ userId: ObjectId, status: String }]
+  +title: String
+  +createdAt: Date
+  +updatedAt: Date
+}
+class TravelHistory <<Model>> {
+  +travelHistoryId: ObjectId
+  +creatorId: ObjectId
+  +plan: ObjectId
+  +participants: ObjectId[]
+  +destination: String
+  +arrivalDate: Date
+  +returnDate: Date
+  +status: String
+  +notes: Array
+  +expenses: Array
+  +createdAt: Date
+  +updatedAt: Date
+}
+
+' ==== LAYERED FLOW ====
+RatingRouter --> AuthMiddleware : use
+ReportRouter --> AuthMiddleware : use
+AuthMiddleware --> RatingController : pass if verified
+AuthMiddleware --> ReportController : pass if verified
+RatingController --> Rating : CRUD
+ReportController --> Report : CRUD
+Rating --> User : userRated, userIsRated
+Rating --> TravelHistory : travelHistoryId
+Report --> User : userReported, userIsReported
+Report --> TravelHistory : travelHistoryId
+
+@enduml

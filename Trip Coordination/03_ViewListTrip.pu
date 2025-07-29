@@ -1,0 +1,35 @@
+@startuml
+' Sequence diagram: View list of user's trips
+' Flow: FE calls GET /travelhistory/ -> router -> controller -> model -> return result
+
+title View List of User's Trips
+
+actor User
+participant TripListScreen
+participant travelHistroyRouters
+participant travelHistoryController
+Database Database
+
+User -> TripListScreen : 1. Open trip list screen
+activate TripListScreen
+TripListScreen -> travelHistroyRouters : 2. GET /travelhistory/ (with token)
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call getAllUserTravelHistory
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trips where user is creator or participant
+activate Database
+Database --> travelHistoryController : 5. Return list of trips
+deactivate Database
+
+travelHistoryController --> travelHistroyRouters : 6. Return response 200 + trips list
+deactivate travelHistoryController
+
+travelHistroyRouters --> TripListScreen : 7. Return result (success/error)
+deactivate travelHistroyRouters
+
+TripListScreen --> User : 8. Show trip list or error
+deactivate TripListScreen
+
+@enduml

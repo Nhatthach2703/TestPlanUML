@@ -1,0 +1,60 @@
+@startuml
+' Sequence diagram: Add Participant to Trip
+' Flow: FE calls POST /travelhistory/:id/participants -> router -> controller -> model -> return result
+
+title Add Participant in Trip
+
+actor User
+participant TripParticipantScreen
+participant travelHistroyRouters
+participant travelHistoryController
+Database Database
+
+User -> TripParticipantScreen : 1. Select user to add to trip and press add
+activate TripParticipantScreen
+TripParticipantScreen -> travelHistroyRouters : 2. POST /travelhistory/:id/participants (body: participantId)
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call addParticipant (after authentication, authorization)
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trip by id
+activate Database
+Database --> travelHistoryController : 5. Return trip or null
+deactivate Database
+
+travelHistoryController -> travelHistoryController : 6. Check permission (only creator)
+activate travelHistoryController
+deactivate travelHistoryController
+
+alt If valid
+    travelHistoryController -> Database : 7. Find participant by id
+    activate Database
+    Database --> travelHistoryController : 8. Return participant or null
+    deactivate Database
+
+    travelHistoryController -> travelHistoryController : 9. Check if participant already in trip
+    activate travelHistoryController
+    deactivate travelHistoryController
+
+    alt Participant valid & not in trip
+        travelHistoryController -> Database : 10. Add participant to trip, save
+        activate Database
+        Database --> travelHistoryController : 11. Return updated trip
+        deactivate Database
+
+        travelHistoryController --> travelHistroyRouters : 12. Return response 200 + updated trip
+    else If participant invalid/already in trip
+        travelHistoryController --> travelHistroyRouters : 10.1. Return error 400/404
+    end
+else If not valid (not creator/not found trip)
+    travelHistoryController --> travelHistroyRouters : 7.1. Return error 403/404
+    deactivate travelHistoryController
+end
+
+travelHistroyRouters --> TripParticipantScreen : 13. Return result (success/error)
+deactivate travelHistroyRouters
+TripParticipantScreen --> User : 14. Show result (success/failure)
+deactivate TripParticipantScreen
+
+@enduml

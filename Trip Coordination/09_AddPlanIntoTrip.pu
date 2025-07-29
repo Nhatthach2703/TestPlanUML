@@ -1,0 +1,47 @@
+@startuml
+' Sequence diagram: Add Plan Into Trip
+' Flow: FE calls PUT /travelhistory/:id (body: plan) -> router -> controller -> model -> return result
+
+title Add Plan Into Trip
+
+actor User
+participant TripPlanScreen
+participant travelHistroyRouters
+participant travelHistoryController
+Database Database
+
+User -> TripPlanScreen : 1. Choose plan for trip
+activate TripPlanScreen
+TripPlanScreen -> travelHistroyRouters : 2. PUT /travelhistory/:id (body: plan)
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call updateTravelHistory
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trip by id
+activate Database
+Database --> travelHistoryController : 5. Return trip or null
+deactivate Database
+
+travelHistoryController -> travelHistoryController : 6. Validate trip & permission
+activate travelHistoryController
+deactivate travelHistoryController
+
+alt If trip found & user is creator
+    travelHistoryController -> Database : 7. Update plan field
+    activate Database
+    Database --> travelHistoryController : 8. Return updated trip
+    deactivate Database
+
+    travelHistoryController --> travelHistroyRouters : 9. Return response 200 + updated trip
+else If not found or unauthorized
+    travelHistoryController --> travelHistroyRouters : 7.1. Return error 404/403
+    deactivate travelHistoryController
+end
+
+travelHistroyRouters --> TripPlanScreen : 10. Return result (success/error)
+deactivate travelHistroyRouters
+TripPlanScreen --> User : 11. Show result
+deactivate TripPlanScreen
+
+@enduml

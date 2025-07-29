@@ -1,0 +1,113 @@
+@startuml
+' ==== CONTROLLERS ====
+class travelHistoryController <<Controller>> {
+  +updateTravelHistory()
+  +addParticipant()
+  +removeParticipant()
+  +getAllUserTravelHistory()
+  +getTravelHistoryById()
+  +cancelTravelHistory()
+  +changeStatus()
+  +addTravelNote()
+  +updateTravelNote()
+  +deleteTravelNote()
+  +addExpense()
+  +updateExpense()
+  +deleteExpense()
+  +getAllTravelHistories()
+}
+class chatController <<Controller>> {
+  +createTravelHistory()
+}
+
+' ==== ROUTERS ====
+class travelHistroyRouters <<Router>>
+class chatRouters <<Router>>
+
+' ==== UTILS ====
+class chatUtils <<Helper/Service>> {
+  +emitChatListUpdate()
+  +emitNewChatRoomEvent()
+  +emitChatRoomDeletedEvent()
+  +createSystemMessage()
+  +processAttachments()
+  +deleteAttachmentsFromCloudinary()
+  +deleteAllMessagesInChatRoom()
+  +getChatRoomsWithLastMessage()
+}
+class cloudinaryUtils <<Helper/Service>> {
+  +uploadFilesToCloudinary()
+}
+
+' ==== MODELS ====
+class TravelHistory <<Model>> {
+  +creatorId: User
+  +participants: User[*]
+  +plan: TravelPlan
+  +destination: String
+  +arrivalDate: Date
+  +returnDate: Date
+  +status: String
+  +notes: Note[]
+  +expenses: Expense[]
+}
+class User <<Model>> {
+  +fullName: String
+  +email: String
+  +avatar: String
+  +gender: String
+  +phone: String
+  +travelStatus: Boolean
+  +currentLocation: String
+}
+class TravelPlan <<Model>> {
+  +plans: Array
+}
+class Note <<Embedded>> {
+  +text: String
+  +images: Image[]
+  +createdAt: Date
+}
+class Image <<Embedded>> {
+  +url: String
+  +publicId: String
+  +uploadedAt: Date
+}
+class Expense <<Embedded>> {
+  +name: String
+  +price: Number
+  +description: String
+  +date: Date
+}
+class ChatRoom <<Model>> {
+  +name: String
+  +isGroup: Boolean
+  +participants: User[*]
+  +createdBy: User
+}
+
+' ==== RELATIONSHIPS ====
+travelHistroyRouters --> travelHistoryController : calls
+chatRouters --> chatController : calls
+travelHistoryController --> TravelHistory : CRUD
+travelHistoryController --> User : read
+travelHistoryController --> cloudinaryUtils : call
+travelHistoryController --> chatUtils : call
+chatController --> TravelHistory : CRUD
+chatController --> ChatRoom : read
+chatController --> User : read
+chatController --> chatUtils : call
+chatController --> cloudinaryUtils : call
+chatUtils --> ChatRoom : CRUD
+chatUtils --> User : read
+chatUtils --> Message : CRUD
+chatUtils --> Notification : CRUD
+cloudinaryUtils --> Image : upload
+TravelHistory --> User : creatorId, participants
+TravelHistory --> TravelPlan : plan
+TravelHistory --> Note : notes
+TravelHistory --> Expense : expenses
+Note --> Image : images
+ChatRoom --> User : participants, createdBy
+
+@enduml

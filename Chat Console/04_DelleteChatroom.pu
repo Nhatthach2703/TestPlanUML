@@ -1,0 +1,82 @@
+@startuml
+title Delete Chat Room
+
+actor User
+participant ChatScreen
+participant ChatRoutes
+participant ChatController
+participant ChatUtils
+participant SocketIOServer
+database Database
+
+User -> ChatScreen : 1. Request to delete chat room
+activate ChatScreen
+ChatScreen -> ChatRoutes : 2. Request DELETE /api/chatrooms/:id
+activate ChatRoutes
+ChatRoutes -> ChatController : 3. Call function deleteChatRoom
+activate ChatController
+
+ChatController -> Database : 4. Find ChatRoom by ID
+activate Database
+Database --> ChatController : 5. Return ChatRoom object
+deactivate Database
+
+ChatController -> ChatUtils : 6. Call validateChatRoomPermissions
+activate ChatUtils
+ChatUtils --> ChatController : 7. Return validation result
+deactivate ChatUtils
+
+ChatController -> ChatController: 8. validate result
+activate ChatController
+deactivate ChatController
+
+alt Validation failed
+    ChatController --> ChatRoutes : 9.1. Return error (e.g., 403 Forbidden)
+    ' deactivate ChatController
+    ChatRoutes --> ChatScreen : 10.1. Return error response
+    ' deactivate ChatRoutes
+    ChatScreen --> User : 11.1. Show error message "Permission denied"
+    ' deactivate ChatScreen
+else Validation successful
+    ChatController -> ChatUtils : 9. Call deleteAllMessagesInChatRoom
+    activate ChatUtils
+    ChatUtils -> Database : 10. Find and delete all messages in chat room
+    activate Database
+    Database --> ChatUtils : 11. Confirm deletion
+    deactivate Database
+    ChatUtils --> ChatController : 12. Return on completion
+    deactivate ChatUtils
+
+    ChatController -> Database : 13. Delete all notifications for the chat room
+    activate Database
+    Database --> ChatController : 14. Confirm deletion
+    deactivate Database
+
+    ChatController -> Database : 15. Delete the chat room itself
+    activate Database
+    Database --> ChatController : 16. Confirm deletion
+    deactivate Database
+
+    ChatController -> ChatUtils : 17. Call emitChatRoomDeletedEvent
+    activate ChatUtils
+    ' note right of ChatUtils
+    '     This function emits two events:
+    '     1. "chatRoomDeleted" to notify clients.
+    '     2. "chatListUpdate" to remove the room from lists.
+    ' end note
+    ChatUtils -> SocketIOServer : 18. Emit "chatRoomDeleted" & "chatListUpdate" to all participants
+    activate SocketIOServer
+    ' SocketIOServer --> ChatUtils: 19. Confirm done
+    deactivate SocketIOServer
+    ' ChatUtils --> ChatController: 20. Confirm done
+    deactivate ChatUtils
+
+    ChatController --> ChatRoutes : 19. Return success response (200 OK)
+    deactivate ChatController
+    ChatRoutes --> ChatScreen : 20. Return success response
+    deactivate ChatRoutes
+    ChatScreen --> User : 21. Update UI (remove chat room)
+    deactivate ChatScreen
+end
+
+@enduml

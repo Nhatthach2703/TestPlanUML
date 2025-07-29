@@ -1,0 +1,81 @@
+@startuml
+title Edit Travel Info
+actor User
+participant TravelInfoScreen
+participant TravelInfoRouters
+participant AuthMiddleware
+participant AuthorizeMiddleware
+participant TravelInfoController
+database Database
+
+User -> TravelInfoScreen : 1 : Enter updated travel info (destination, arrivalDate, returnDate)
+activate TravelInfoScreen
+
+TravelInfoScreen -> TravelInfoScreen : 2 : Validate input data
+activate TravelInfoScreen
+deactivate TravelInfoScreen
+
+alt Validate wrong
+    TravelInfoScreen --> User : 2.1 : Show error message
+else Validate right
+    TravelInfoScreen -> TravelInfoRouters : 3 : PUT request to /travel-info
+    activate TravelInfoRouters
+
+    TravelInfoRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> TravelInfoRouters : 4.1 : Return unauthorized error
+        TravelInfoRouters --> TravelInfoScreen : 4.2 : Return status 401
+        TravelInfoScreen --> User : 4.3 : Show "Unauthorized" message
+    
+    else Token valid
+        AuthMiddleware --> TravelInfoRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        TravelInfoRouters -> AuthorizeMiddleware : 6 : Check user role
+        activate AuthorizeMiddleware
+
+        alt Role not authorized
+            AuthorizeMiddleware --> TravelInfoRouters : 6.1 : Return forbidden error
+            TravelInfoRouters --> TravelInfoScreen : 6.2 : Return status 403
+            TravelInfoScreen --> User : 6.3 : Show "Access denied" message
+        else Role authorized (user)
+            AuthorizeMiddleware --> TravelInfoRouters : 7 : Role verified
+            deactivate AuthorizeMiddleware
+
+            TravelInfoRouters -> TravelInfoController : 8 : Call updateTravelInfo function
+            activate TravelInfoController
+
+            TravelInfoController -> TravelInfoController : 9 : Validate return date > arrival date
+            activate TravelInfoController
+            deactivate TravelInfoController
+
+            alt Date validation failed
+                TravelInfoController --> TravelInfoRouters : 9.1 : Return 400 error
+                TravelInfoRouters --> TravelInfoScreen : 9.2 : Return status 400
+                TravelInfoScreen --> User : 9.3 : Show "Return date must be greater than arrival date" message
+            else Date validation passed
+                TravelInfoController -> Database : 10 : Update travel info by userId
+                activate Database
+                Database --> TravelInfoController : 11 : Return updated travel info
+                deactivate Database
+
+                alt Travel info not found
+                    TravelInfoController --> TravelInfoRouters : 11.1 : Return 404 error
+                    TravelInfoRouters --> TravelInfoScreen : 11.2 : Return status 404
+                    TravelInfoScreen --> User : 11.3 : Show "Travel info not found for the user" message
+                else Travel info updated successfully
+                    TravelInfoController --> TravelInfoRouters : 12 : Return success message and updated data
+                    deactivate TravelInfoController
+                    TravelInfoRouters --> TravelInfoScreen : 13 : Return status 200 and response object
+                    deactivate TravelInfoRouters
+                    TravelInfoScreen --> User : 14 : Show "Travel info updated successfully" message
+                    deactivate TravelInfoScreen
+                end
+            end
+        end
+    end
+end
+
+@enduml

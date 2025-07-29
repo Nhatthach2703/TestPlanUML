@@ -1,0 +1,106 @@
+@startuml
+title Create Rating
+actor User
+participant RatingScreen
+participant RatingRouters
+participant AuthMiddleware
+participant RatingController
+database Database
+
+User -> RatingScreen : 1 : Enter rating data (userIsRated, ratingValue, travelHistoryId)
+activate RatingScreen
+
+RatingScreen -> RatingScreen : 2 : Validate input data
+activate RatingScreen
+deactivate RatingScreen
+alt Validate wrong
+    RatingScreen --> User : 2.1 : Show error message
+else Validate right
+    RatingScreen -> RatingRouters : 3 : POST request to /rating
+    activate RatingRouters
+
+    RatingRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> RatingRouters : 4.1 : Return unauthorized error
+        RatingRouters --> RatingScreen : 4.2 : Return status 401
+        RatingScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> RatingRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        RatingRouters -> RatingController : 6 : Call createRating function
+        activate RatingController
+
+        RatingController -> RatingController : 7 : Validate required fields (userIsRated, ratingValue, travelHistoryId)
+        activate RatingController
+        deactivate RatingController
+
+        alt Required fields missing
+            RatingController --> RatingRouters : 7.1 : Return 400 error
+            RatingRouters --> RatingScreen : 7.2 : Return status 400
+            RatingScreen --> User : 7.3 : Show "Required fields missing" message
+        else Required fields present
+            RatingController -> RatingController : 8 : Check if user trying to rate themselves
+            activate RatingController
+            deactivate RatingController
+
+            alt User rating themselves
+                RatingController --> RatingRouters : 8.1 : Return 400 error
+                RatingRouters --> RatingScreen : 8.2 : Return status 400
+                RatingScreen --> User : 8.3 : Show "You cannot rate yourself" message
+            else Valid user to rate
+                RatingController -> RatingController : 9 : Validate rating value (1-5)
+                activate RatingController
+                deactivate RatingController
+
+                alt Invalid rating value
+                    RatingController --> RatingRouters : 9.1 : Return 400 error
+                    RatingRouters --> RatingScreen : 9.2 : Return status 400
+                    RatingScreen --> User : 9.3 : Show "Rating value must be between 1 and 5" message
+                else Valid rating value
+                    RatingController -> Database : 10 : Check if rating already exists for this trip
+                    activate Database
+                    Database --> RatingController : 11 : Return existing rating or null
+                    deactivate Database
+
+                    alt Rating already exists
+                        RatingController -> Database : 12a : Update existing rating value
+                        activate Database
+                        Database --> RatingController : 13a : Return updated rating
+                        deactivate Database
+                    else Rating does not exist
+                        RatingController -> Database : 12b : Create new rating
+                        activate Database
+                        Database --> RatingController : 13b : Return created rating
+                        deactivate Database
+                    end
+
+                    RatingController -> Database : 14 : Fetch all ratings for the rated user
+                    activate Database
+                    Database --> RatingController : 15 : Return all user ratings
+                    deactivate Database
+
+                    RatingController -> RatingController : 16 : Calculate average rating
+                    activate RatingController
+                    deactivate RatingController
+
+                    RatingController -> Database : 17 : Update rated user's average rate
+                    activate Database
+                    Database --> RatingController : 18 : Return updated user
+                    deactivate Database
+
+                    RatingController --> RatingRouters : 19 : Return success message with rating and average
+                    deactivate RatingController
+                    RatingRouters --> RatingScreen : 20 : Return status 201 and response object
+                    deactivate RatingRouters
+                    RatingScreen --> User : 21 : Show "Rating created/updated successfully" message
+                    deactivate RatingScreen
+                end
+            end
+        end
+    end
+end
+
+@enduml

@@ -1,0 +1,64 @@
+@startuml
+' ==== LAYERS ====
+class MatchUserRouters <<Router>>
+class TravelInfoRouters <<Router>>
+class AuthMiddleware <<Middleware>>
+class MatchUserController <<Controller>> {
+  +findMatchingUsers()
+}
+class TravelInfoController <<Controller>> {
+  +createTravelInfo()
+  +updateTravelInfo()
+  +getTravelInfoByUserId()
+}
+
+' ==== MODELS ====
+class User <<Model>> {
+  +fullName: String
+  +email: String
+  +gender: String
+  +dob: Date
+  +job: String
+  +phone: String
+  +address: String
+  +hometown: String
+  +cccd: String
+  +hobbies: String[]
+  +description: String
+  +rate: Number
+  +avatar: { url: String, publicId: String }
+  +coverImage: { url: String, publicId: String }
+  +travelStatus: Boolean
+  +currentLocation: String
+  +payment: String
+  +connections: [{ userId: ObjectId, status: String }]
+  +title: String
+}
+
+class TravelInfo <<Model>> {
+  +userId: User
+  +destination: String
+  +arrivalDate: Date
+  +returnDate: Date
+}
+
+' ==== DATABASE ====
+class Database <<Database>>
+
+' ==== RELATIONSHIPS ====
+MatchUserRouters --> AuthMiddleware : use
+MatchUserRouters --> MatchUserController : call
+MatchUserController --> Database : query
+MatchUserController --> TravelInfo : read
+MatchUserController --> User : read
+
+TravelInfoRouters --> AuthMiddleware : use
+TravelInfoRouters --> TravelInfoController : call
+TravelInfoController --> Database : query
+TravelInfoController --> TravelInfo : CRUD
+TravelInfoController --> User : update travelStatus
+
+Database --> User : store
+Database --> TravelInfo : store
+
+@enduml

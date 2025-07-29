@@ -1,0 +1,81 @@
+@startuml
+title Create Report
+actor User
+participant ReportScreen
+participant ReportRouters
+participant AuthMiddleware
+participant ReportController
+database Database
+
+User -> ReportScreen : 1 : Enter report data (userIsReported, titleReport, description, travelHistoryId)
+activate ReportScreen
+
+ReportScreen -> ReportScreen : 2 : Validate input data
+activate ReportScreen
+deactivate ReportScreen
+alt Validate wrong
+    ReportScreen --> User : 2.1 : Show error message
+else Validate right
+    ReportScreen -> ReportRouters : 3 : POST request to /report
+    activate ReportRouters
+
+    ReportRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> ReportRouters : 4.1 : Return unauthorized error
+        ReportRouters --> ReportScreen : 4.2 : Return status 401
+        ReportScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> ReportRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        ReportRouters -> ReportController : 6 : Call createReport function
+        activate ReportController
+
+        ReportController -> ReportController : 7 : Validate required fields (userIsReported, travelHistoryId)
+        activate ReportController
+        deactivate ReportController
+
+        alt Required fields missing
+            ReportController --> ReportRouters : 7.1 : Return 400 error
+            ReportRouters --> ReportScreen : 7.2 : Return status 400
+            ReportScreen --> User : 7.3 : Show "userIsReported and travelHistoryId are required" message
+        else Required fields present
+            ReportController -> ReportController : 8 : Check if user trying to report themselves
+            activate ReportController
+            deactivate ReportController
+
+            alt User reporting themselves
+                ReportController --> ReportRouters : 8.1 : Return 400 error
+                ReportRouters --> ReportScreen : 8.2 : Return status 400
+                ReportScreen --> User : 8.3 : Show "You cannot report yourself" message
+            else Valid user to report
+                ReportController -> Database : 9 : Check if report already exists for this trip
+                activate Database
+                Database --> ReportController : 10 : Return existing report or null
+                deactivate Database
+
+                alt Report already exists
+                    ReportController --> ReportRouters : 10.1 : Return 400 error
+                    ReportRouters --> ReportScreen : 10.2 : Return status 400
+                    ReportScreen --> User : 10.3 : Show "You have already reported this user for this trip" message
+                else Report does not exist
+                    ReportController -> Database : 11 : Create new report
+                    activate Database
+                    Database --> ReportController : 12 : Return created report
+                    deactivate Database
+
+                    ReportController --> ReportRouters : 13 : Return success message with report data
+                    deactivate ReportController
+                    ReportRouters --> ReportScreen : 14 : Return status 201 and response object
+                    deactivate ReportRouters
+                    ReportScreen --> User : 15 : Show "Report created successfully" message
+                    deactivate ReportScreen
+                end
+            end
+        end
+    end
+end
+
+@enduml

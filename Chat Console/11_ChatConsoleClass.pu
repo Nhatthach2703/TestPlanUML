@@ -1,0 +1,114 @@
+@startuml
+' Chat Feature Architecture (Router - Middleware - Controller - Utils - Model)
+
+' ==== LAYERS ====
+class ChatRouter <<Router>>
+class AuthMiddleware <<Middleware>>
+class ChatController <<Controller>> {
+  +getAllChatRooms()
+  +getChatRooms()
+  +getChatRoomById()
+  +createChatRoom()
+  +sendMessage()
+  +getMessages()
+  +deleteChatRoom()
+  +deleteMessage()
+  +leaveChatRoom()
+  +addParticipant()
+  +removeParticipant()
+  +editChatRoomName()
+  +handleChatAI()
+  +clearChatAI()
+  +getUserChatRoomsByUserId()
+}
+
+' ==== UTILS ====
+class chatUtils <<Helper/Service>> {
+  +sortChatRoomsByLastMessage()
+  +formatLastMessage()
+  +getChatRoomsWithLastMessage()
+  +uploadFileToCloudinary()
+  +processAttachments()
+  +deleteAttachmentsFromCloudinary()
+  +deleteAllMessagesInChatRoom()
+  +emitChatListUpdate()
+  +emitNewChatRoomEvent()
+  +emitChatRoomDeletedEvent()
+  +createSystemMessage()
+  +validateChatRoomPermissions()
+}
+
+class notificationUtils <<Helper/Service>> {
+  +createNotification()
+  +sendRealtimeNotification()
+  +createChatNotification()
+  +createConnectionNotification()
+  +getUnreadCount()
+  +markAsRead()
+}
+
+' ==== MODELS ====
+class ChatRoom <<Model>> {
+  +name: String
+  +isGroup: Boolean
+  +participants: User[*]
+  +createdBy: User
+}
+
+class Message <<Model>> {
+  +chatRoomId: ChatRoom
+  +sender: User
+  +content: String
+  +messageType: String
+  +systemData: Mixed
+}
+
+class Notification <<Model>> {
+  +userId: User
+  +content: String
+  +type: String
+  +relatedId: ObjectId
+  +relatedModel: String
+  +priority: String
+  +isRead: Boolean
+  +fromUser: User
+  +data: Mixed
+}
+
+class User <<Model>> {
+  +fullName: String
+  +email: String
+  +gender: String
+  +dob: Date
+  +job: String
+  +phone: String
+  +address: String
+  +hometown: String
+  +cccd: String
+  +hobbies: String[]
+  +description: String
+  +rate: Number
+  +avatar: { url: String, publicId: String }
+  +coverImage: { url: String, publicId: String }
+  +travelStatus: Boolean
+  +currentLocation: String
+  +payment: String
+  +connections: [{ userId: ObjectId, status: String }]
+  +title: String
+}
+
+' ==== LAYERED FLOW ====
+ChatRouter --> AuthMiddleware : use
+AuthMiddleware --> ChatController : pass if verified
+ChatController --> chatUtils : call
+ChatController --> notificationUtils : call
+chatUtils --> ChatRoom : CRUD
+chatUtils --> Message : CRUD
+chatUtils --> User : read
+notificationUtils --> Notification : CRUD
+notificationUtils --> User : read
+ChatRoom --> User : participants
+Message --> User : sender
+Notification --> User : userId, fromUser
+
+@enduml

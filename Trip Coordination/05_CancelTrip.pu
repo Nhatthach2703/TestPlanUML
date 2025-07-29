@@ -1,0 +1,47 @@
+@startuml
+' Sequence diagram: Cancel a trip
+' Flow: FE calls PUT /travelhistory/:id/status -> controller -> model -> return result
+
+title Cancel Trip
+
+actor User
+participant TravelHistoryDetailScreen
+participant travelHistroyRouters
+participant travelHistoryController
+Database Database
+
+User -> TravelHistoryDetailScreen : 1. Click "Cancel Trip"
+activate TravelHistoryDetailScreen
+TravelHistoryDetailScreen -> travelHistroyRouters : 2. PUT /travelhistory/:id/status (body: status="cancelled")
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call changeStatus
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trip by id
+activate Database
+Database --> travelHistoryController : 5. Return trip or null
+deactivate Database
+
+travelHistoryController -> travelHistoryController : 6. Check permission & status
+activate travelHistoryController
+deactivate travelHistoryController
+
+alt If valid (creator & allowed status)
+    travelHistoryController -> Database : 7. Update status = "cancelled"
+    activate Database
+    Database --> travelHistoryController : 8. Return updated trip
+    deactivate Database
+
+    travelHistoryController --> travelHistroyRouters : 9. Return response 200 + updated trip
+else If not valid (not creator, invalid status, ...)
+    travelHistoryController --> travelHistroyRouters : 7.1. Return error 403/400/404
+    deactivate travelHistoryController
+end
+
+travelHistroyRouters --> TravelHistoryDetailScreen : 10. Return result (success/error)
+deactivate travelHistroyRouters
+TravelHistoryDetailScreen --> User : 11. Show result (success/failure)
+deactivate TravelHistoryDetailScreen
+
+@enduml

@@ -1,0 +1,42 @@
+@startuml
+' Sequence diagram: View detail of a trip
+' Flow: FE calls GET /travelhistory/:id -> controller -> model -> return result
+
+title View Detail Trip
+
+actor User
+participant TripDetailScreen
+participant travelHistroyRouters
+participant travelHistoryController
+Database Database
+
+User -> TripDetailScreen : 1. Select a trip to view details
+activate TripDetailScreen
+TripDetailScreen -> travelHistroyRouters : 2. GET /travelhistory/:id
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call getTravelHistoryById
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trip by id
+activate Database
+Database --> travelHistoryController : 5. Return trip or null
+deactivate Database
+
+travelHistoryController -> travelHistoryController : 6. Check trip data
+activate travelHistoryController
+deactivate travelHistoryController
+
+alt If trip found & user is participant
+    travelHistoryController --> travelHistroyRouters : 7. Return response 200 + trip detail
+else If not found or unauthorized
+    travelHistoryController --> travelHistroyRouters : 7.1. Return error 404/403
+    deactivate travelHistoryController
+end
+
+travelHistroyRouters --> TripDetailScreen : 8. Return result (success/error)
+deactivate travelHistroyRouters
+TripDetailScreen --> User : 9. Show trip detail or error
+deactivate TripDetailScreen
+
+@enduml

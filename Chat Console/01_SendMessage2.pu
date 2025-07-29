@@ -1,0 +1,85 @@
+@startuml
+title Send Message
+
+actor User
+participant ChatScreen
+participant ChatRoutes
+participant ChatController
+participant ChatUtils
+participant NotificationUtils
+participant SocketIOServer
+database Database
+
+User -> ChatScreen : 1. Enter and send message
+activate ChatScreen
+ChatScreen -> ChatRoutes : 2. Request POST sendMessage
+activate ChatRoutes
+ChatRoutes -> ChatController : 3. Call function sendMessage
+activate ChatController
+
+ChatController -> Database : 4. Find ChatRoom by ID
+activate Database
+Database --> ChatController : 5. Return ChatRoom result
+deactivate Database
+
+ChatController -> ChatController : 6. Verify Result
+activate ChatController
+deactivate ChatController
+
+alt ChatRoom not found
+    ChatController --> ChatRoutes : 7.1. Return error message
+    ' deactivate ChatController
+    ChatRoutes --> ChatScreen : 8.1. Return status 404
+    ' deactivate ChatRoutes
+    ChatScreen --> User : 9.1. Show error "Chat room not found"
+    ' deactivate ChatScreen
+else ChatRoom found
+    ChatController -> Database : 7. Save new Message
+    activate Database
+    Database --> ChatController : 8. Return saved Message object (populated)
+    deactivate Database
+
+    ChatController -> SocketIOServer : 9. Emit "newMessage" to ChatRoom
+    activate SocketIOServer
+    ' SocketIOServer --> ChatController : 10. Confirm done
+    deactivate SocketIOServer
+
+    ChatController -> Database : 10. Find ChatRoom with participants
+    activate Database
+    Database --> ChatController : 11. Return ChatRoom with participants
+    deactivate Database
+
+    ChatController -> ChatUtils : 12. Call emitChatListUpdate
+    activate ChatUtils
+    ChatUtils -> SocketIOServer : 13. Emit "chatListUpdate" to all participants
+    activate SocketIOServer
+    ' SocketIOServer --> ChatUtils : 14. Confirm done
+    deactivate SocketIOServer
+    ' ChatUtils --> ChatController : 15. Confirm done
+    deactivate ChatUtils
+
+    loop for each participant != sender
+        ChatController -> NotificationUtils : 14. Call createChatNotification
+        activate NotificationUtils
+        NotificationUtils -> Database : 15. Save new Notification
+        activate Database
+        Database --> NotificationUtils : 16. Return Notification object
+        deactivate Database
+
+        NotificationUtils -> SocketIOServer : 17. Emit "newNotification" to participant
+        activate SocketIOServer
+        ' SocketIOServer --> NotificationUtils : Confirm done
+        deactivate SocketIOServer
+        ' NotificationUtils --> ChatController : Confirm done
+        deactivate NotificationUtils
+    end
+
+    ChatController --> ChatRoutes : 18. Return success message & data
+    deactivate ChatController
+    ChatRoutes --> ChatScreen : 19. Return status 201
+    deactivate ChatRoutes
+    ChatScreen --> User : 20. Display new message in chat
+    deactivate ChatScreen
+end
+
+@enduml

@@ -1,0 +1,76 @@
+@startuml
+title Delete Chat Room Message
+
+actor User
+participant ChatScreen
+participant ChatRoutes
+participant ChatController
+participant ChatUtils
+participant SocketIOServer
+database Database
+
+User -> ChatScreen : 1. Select "Delete message"
+activate ChatScreen
+ChatScreen -> ChatRoutes : 2. Send DELETE /:id/message/:messageId
+activate ChatRoutes
+ChatRoutes -> ChatController : 3. Call deleteMessage function
+activate ChatController
+
+ChatController -> Database : 4. Find message by messageId and chatRoomId
+activate Database
+Database --> ChatController : 5. Return message
+deactivate Database
+
+ChatController -> ChatController : 6. check return message data
+activate ChatController
+deactivate ChatController
+
+alt Message not found
+    ChatController --> ChatRoutes : 7.1. Return 404 error
+    ChatRoutes --> ChatScreen : 8.1. Show error "Message not found"
+    ChatScreen --> User : 9.1. Display error
+else Message found
+    ChatController -> ChatController : 7. Check delete permission
+    activate ChatController
+    deactivate ChatController
+    alt No permission
+        ChatController --> ChatRoutes : 8.2. Return 403 error
+        ChatRoutes --> ChatScreen : 9.2. Show error "No permission"
+        ChatScreen --> User : 10.2. Display error
+    else Has permission
+        ChatController -> Database : 8. Delete message from DB
+        activate Database
+        Database --> ChatController : 9. Confirm deletion
+        deactivate Database
+
+        ChatController -> Database : 10. Get latest last message
+        activate Database
+        Database --> ChatController : 11. Return last message
+        deactivate Database
+
+        ChatController -> SocketIOServer : 12. Emit "messageDeleted" to room
+        activate SocketIOServer
+        deactivate SocketIOServer
+
+        ChatController -> Database : 13. Get chatRoom participants
+        activate Database
+        Database --> ChatController : 14. Return participants
+        deactivate Database
+
+        ChatController -> ChatUtils : 15. Emit "chatListUpdate" to participants
+        activate ChatUtils
+        ChatUtils -> SocketIOServer : 16. Emit "chatListUpdate"
+        activate SocketIOServer
+        deactivate SocketIOServer
+        deactivate ChatUtils
+
+        ChatController --> ChatRoutes : 17. Return success
+        deactivate ChatController
+        ChatRoutes --> ChatScreen : 18. Return status 200
+        deactivate ChatRoutes
+        ChatScreen --> User : 19. Update UI, remove message
+        deactivate ChatScreen
+    end
+end
+
+@enduml

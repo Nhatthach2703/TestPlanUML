@@ -1,0 +1,73 @@
+@startuml
+title Edit Chat Room Name
+
+actor User
+participant EditChatRoomScreen
+participant ChatRouters
+participant ChatController
+participant ChatUtils
+participant SocketIOServer
+database Database
+
+User -> EditChatRoomScreen : 1. Enter new room name and confirm change
+activate EditChatRoomScreen
+EditChatRoomScreen -> ChatRouters : 2. Request PUT /api/chatrooms/{id}/editName
+activate ChatRouters
+
+ChatRouters -> ChatController : 3. Call editChatRoomName(req, res)
+activate ChatController
+
+ChatController -> Database : 4. Find ChatRoom by id
+activate Database
+Database --> ChatController : 5. Return ChatRoom
+deactivate Database
+
+ChatController -> ChatController : 6. Check permissions and validate data
+activate ChatController
+deactivate ChatController
+
+alt ChatRoom not found or insufficient permissions
+    ChatController --> ChatRouters : 7.1. Return error (404/403)
+    ChatRouters --> EditChatRoomScreen : 8.1. Display error message
+    EditChatRoomScreen --> User : 9.1. Show error
+else Conditions met to rename
+    ChatController -> Database : 7. Update ChatRoom with the new name
+    activate Database
+    Database --> ChatController : 8. Return updated ChatRoom
+    deactivate Database
+
+    ChatController -> Database : 9. Get info of the user making the change
+    activate Database
+    Database --> ChatController : 10. Return user
+    deactivate Database
+
+    ChatController -> ChatUtils : 11. Create "chatRoomNameChanged" system message
+    activate ChatUtils
+    ChatUtils -> Database : 12. Save system message to Message collection
+    activate Database
+    Database --> ChatUtils : 13. Return system message
+    deactivate Database
+    ChatUtils --> ChatController : 14. Return system message
+    deactivate ChatUtils
+
+    ChatController -> SocketIOServer : 15. Emit "newMessage" to the chat room
+    activate SocketIOServer
+    deactivate SocketIOServer
+
+    ChatController -> ChatUtils : 16. Call emitChatListUpdate for all participants
+    activate ChatUtils
+    ChatUtils -> SocketIOServer : 17. Emit "chatListUpdate" to each participant
+    activate SocketIOServer
+    deactivate SocketIOServer
+    deactivate ChatUtils
+
+    ChatController --> ChatRouters : 18. Return status 200 and updated ChatRoom
+
+deactivate ChatController
+ChatRouters --> EditChatRoomScreen : 19. Return response
+deactivate ChatRouters
+EditChatRoomScreen --> User : 20. Display new room name and success message
+deactivate EditChatRoomScreen
+end
+
+@enduml

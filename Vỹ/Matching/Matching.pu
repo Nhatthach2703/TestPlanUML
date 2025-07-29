@@ -1,0 +1,92 @@
+@startuml
+title Matching Users
+actor User
+participant MatchingScreen
+participant MatchUserRouters
+participant AuthMiddleware
+participant MatchUserController
+database UserDatabase
+
+User -> MatchingScreen : 1 : Request to find matching users
+activate MatchingScreen
+
+MatchingScreen -> MatchUserRouters : 2 : GET request to /match-users
+activate MatchUserRouters
+
+MatchUserRouters -> AuthMiddleware : 3 : Verify JWT token
+activate AuthMiddleware
+
+alt Token invalid
+    AuthMiddleware --> MatchUserRouters : 3.1 : Return unauthorized error
+    MatchUserRouters --> MatchingScreen : 3.2 : Return status 401
+    MatchingScreen --> User : 3.3 : Show "Unauthorized" message
+else Token valid
+    AuthMiddleware --> MatchUserRouters : 4 : Token verified, pass userId
+    deactivate AuthMiddleware
+
+    MatchUserRouters -> MatchUserController : 5 : Call findMatchingUsers function
+    activate MatchUserController
+
+    MatchUserController -> UserDatabase : 6 : Query user by userId
+    activate UserDatabase
+    UserDatabase --> MatchUserController : 7 : Return user data
+    deactivate UserDatabase
+
+    alt User not found or not traveling
+        MatchUserController --> MatchUserRouters : 7.1 : Return 404 error
+        MatchUserRouters --> MatchingScreen : 7.2 : Return status 404
+        MatchingScreen --> User : 7.3 : Show "User not found or not traveling" message
+    else User found and traveling
+        MatchUserController -> UserDatabase : 8 : Query travel info by userId
+        activate UserDatabase
+        UserDatabase --> MatchUserController : 9 : Return travel info
+        deactivate UserDatabase
+        alt Travel info not found
+            MatchUserController --> MatchUserRouters : 9.1 : Return 404 error
+            MatchUserRouters --> MatchingScreen : 9.2 : Return status 404
+            MatchingScreen --> User : 9.3 : Show "Travel information not found" message
+        else Travel info found
+            MatchUserController -> MatchUserController : 10 : Calculate date range (±2 days)
+            activate MatchUserController
+            deactivate MatchUserController
+
+            MatchUserController -> MatchUserController : 11 : Check if travel dates are valid
+            activate MatchUserController
+            deactivate MatchUserController
+
+            alt Travel dates in the past
+                MatchUserController --> MatchUserRouters : 11.1 : Return 400 error
+                MatchUserRouters --> MatchingScreen : 11.2 : Return status 400
+                MatchingScreen --> User : 11.3 : Show "Travel dates are in the past" message
+            else Travel dates valid
+                MatchUserController -> UserDatabase : 12 : Query matching travel infos
+                note right : Find users with same destination\nand arrival date within ±2 days
+                activate UserDatabase
+                UserDatabase --> MatchUserController : 13 : Return matching travel infos
+                deactivate UserDatabase
+
+                MatchUserController -> UserDatabase : 14 : Query matching users by IDs
+                note right : Get users who are currently traveling
+                activate UserDatabase
+                UserDatabase --> MatchUserController : 15 : Return matching users
+                deactivate UserDatabase
+
+                MatchUserController -> MatchUserController : 16 : Calculate common hobbies
+                activate MatchUserController
+                deactivate MatchUserController
+
+                MatchUserController -> MatchUserController : 17 : Sort users by common hobbies count
+                activate MatchUserController
+                deactivate MatchUserController
+
+                MatchUserController --> MatchUserRouters : 18 : Return matched users list
+                deactivate MatchUserController
+                MatchUserRouters --> MatchingScreen : 19 : Return status 200 and matched users
+                deactivate MatchUserRouters
+                MatchingScreen --> User : 20 : Display matching users list
+                deactivate MatchingScreen
+            end
+        end
+    end
+end
+@enduml

@@ -1,0 +1,54 @@
+@startuml
+title View Chat Room & Messages
+
+actor User
+participant ChatScreen
+participant ChatRoutes
+participant ChatController
+database Database
+
+User -> ChatScreen : 1. Open chat screen
+activate ChatScreen
+
+par Parallel requests
+    ChatScreen -> ChatRoutes : 2a. GET /:id (getChatRoomById)
+    activate ChatRoutes
+    ChatRoutes -> ChatController : 3a. Call getChatRoomById
+    activate ChatController
+    ChatController -> Database : 4a. Find ChatRoom by ID (populate participants)
+    activate Database
+    Database --> ChatController : 5a. Return ChatRoom
+    ChatController -> ChatController : 6a. Validate return data
+    activate ChatController
+    deactivate ChatController
+    deactivate Database
+    alt ChatRoom not found
+        ChatController --> ChatRoutes : 7a. Return 404 error
+        ChatRoutes --> ChatScreen : 8a. Return error
+        ChatScreen --> User : 9a. Show error "Chat room not found"
+    else ChatRoom found
+        ChatController --> ChatRoutes : 7a. Return ChatRoom data
+        ChatRoutes --> ChatScreen : 8a. Return ChatRoom data
+    end
+    deactivate ChatController
+    deactivate ChatRoutes
+
+    ChatScreen -> ChatRoutes : 2b. GET /:id/messages (getMessages)
+    activate ChatRoutes
+    ChatRoutes -> ChatController : 3b. Call getMessages
+    activate ChatController
+    ChatController -> Database : 4b. Find Messages by chatRoomId (populate sender, sort by createdAt desc)
+    activate Database
+    Database --> ChatController : 5b. Return messages[]
+    deactivate Database
+    ChatController --> ChatRoutes : 6b. Return messages[]
+    ChatRoutes --> ChatScreen : 7b. Return messages[]
+    deactivate ChatController
+    deactivate ChatRoutes
+end
+
+ChatScreen -> User : 10. Display chat room info & messages
+
+deactivate ChatScreen
+
+@enduml

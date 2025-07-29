@@ -1,0 +1,53 @@
+@startuml
+title Create Chat Room
+
+actor User
+participant CreateChatRoomScreen
+participant ChatRouters
+participant ChatControllers
+participant ChatUtils
+participant SocketIOServer
+database Database
+
+User -> CreateChatRoomScreen : 1: Enter chat room name & select participants
+activate CreateChatRoomScreen
+CreateChatRoomScreen -> ChatRouters : 2: Request POST /api/chatrooms
+activate ChatRouters
+
+ChatRouters -> ChatControllers : 3: call createChatRoom(req, res)
+activate ChatControllers
+
+ChatControllers -> Database : 4: Save new ChatRoom document
+activate Database
+Database --> ChatControllers : 5: Return saved document
+deactivate Database
+
+ChatControllers -> Database : 6: Find ChatRoom and populate participants' details
+activate Database
+Database --> ChatControllers : 7: Return populated ChatRoom object
+deactivate Database
+
+ChatControllers -> ChatUtils : 8: call emitNewChatRoomEvent(io, populatedChatRoom)
+activate ChatUtils
+' note right of ChatUtils
+'     This function calls emitChatListUpdate
+'     to notify all participants.
+' end note
+
+ChatUtils -> SocketIOServer : 9: Emit 'chatListUpdate' event to each participant
+activate SocketIOServer
+
+deactivate SocketIOServer
+ChatUtils --> ChatControllers : 10: Return
+deactivate ChatUtils
+
+ChatControllers --> ChatRouters : 11: Respond with status 201 and chat room data
+deactivate ChatControllers
+
+ChatRouters --> CreateChatRoomScreen : 12: Return success response
+deactivate ChatRouters
+
+CreateChatRoomScreen --> User : 13: Display success message and update UI
+deactivate CreateChatRoomScreen
+
+@enduml

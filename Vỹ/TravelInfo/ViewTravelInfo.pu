@@ -1,0 +1,50 @@
+@startuml
+title View Travel Info
+actor User
+participant TravelInfoScreen
+participant TravelInfoRouters
+participant AuthMiddleware
+participant TravelInfoController
+database Database
+
+User -> TravelInfoScreen : 1 : Request to view travel info
+activate TravelInfoScreen
+
+TravelInfoScreen -> TravelInfoRouters : 2 : GET request to /travel-info/:userId
+activate TravelInfoRouters
+
+TravelInfoRouters -> AuthMiddleware : 3 : Verify JWT token
+activate AuthMiddleware
+
+alt Token invalid
+    AuthMiddleware --> TravelInfoRouters : 3.1 : Return unauthorized error
+    TravelInfoRouters --> TravelInfoScreen : 3.2 : Return status 401
+    TravelInfoScreen --> User : 3.3 : Show "Unauthorized" message
+else Token valid
+    AuthMiddleware --> TravelInfoRouters : 4 : Token verified
+    deactivate AuthMiddleware
+
+    TravelInfoRouters -> TravelInfoController : 5 : Call getTravelInfoByUserId function
+    activate TravelInfoController
+
+    TravelInfoController -> Database : 6 : Query travel info by userId
+    activate Database
+    Database --> TravelInfoController : 7 : Return travel info data
+    deactivate Database
+
+    alt Travel info not found
+        TravelInfoController --> TravelInfoRouters : 7.1 : Return 404 error
+        TravelInfoRouters --> TravelInfoScreen : 7.2 : Return status 404
+        TravelInfoScreen --> User : 7.3 : Show "Travel info not found for the user" message
+    else Travel info found
+        TravelInfoController --> TravelInfoRouters : 8 : Return travel info data
+        deactivate TravelInfoController
+        deactivate Database
+        TravelInfoRouters --> TravelInfoScreen : 9 : Return status 200 and travel info
+        deactivate TravelInfoRouters
+        TravelInfoScreen --> User : 10 : Display travel info (destination, arrivalDate, returnDate)
+        deactivate TravelInfoScreen
+    end
+end
+
+@enduml

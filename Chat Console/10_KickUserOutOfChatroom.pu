@@ -1,0 +1,71 @@
+@startuml
+title Kick User Out Of Chat Room
+
+actor "Creator (User)" as Creator
+participant ChatScreen
+participant ChatRoutes
+participant ChatController
+participant ChatUtils
+participant SocketIOServer
+database Database
+
+Creator -> ChatScreen : 1. Click "Kick user"
+activate ChatScreen
+ChatScreen -> ChatRoutes : 2. POST /chat/:id/remove-participant { userIdToRemove }
+activate ChatRoutes
+ChatRoutes -> ChatController : 3. Call removeParticipant
+activate ChatController
+
+ChatController -> Database : 4. Find ChatRoom by id
+activate Database
+Database --> ChatController : 5. Return ChatRoom
+deactivate Database
+
+ChatController -> ChatController : 6. Check creator & participant
+activate ChatController
+deactivate ChatController
+
+alt Not creator or user not in room
+    ChatController --> ChatRoutes : 7. Return error
+    ChatRoutes --> ChatScreen : 8. Return error
+    ChatScreen --> Creator : 9. Show error message
+else Valid
+    ChatController -> Database : 7. Remove user from participants, save ChatRoom
+    activate Database
+    Database --> ChatController : 8. Return updated ChatRoom
+    deactivate Database
+
+    ChatController -> Database : 9. Find removed user info (fullName)
+    activate Database
+    Database --> ChatController : 10. Return user info
+    deactivate Database
+
+    ChatController -> ChatUtils : 11. createSystemMessage("userKickedFromChatroom", { fullName })
+    activate ChatUtils
+    ChatUtils --> ChatController : 12. Return systemMessageData
+    deactivate ChatUtils
+
+    ChatController -> SocketIOServer : 13. Emit "newMessage" (system) to chatroom
+    activate SocketIOServer
+    deactivate SocketIOServer
+
+    ChatController -> ChatUtils : 14. emitChatListUpdate (update chat list)
+    activate ChatUtils
+    ChatUtils -> SocketIOServer : 15. Emit "chatListUpdate" to remaining participants
+    activate SocketIOServer
+    deactivate SocketIOServer
+    deactivate ChatUtils
+
+    ChatController -> SocketIOServer : 16. Emit "kickedFromChatRoom" to user_{userIdToRemove}
+    activate SocketIOServer
+    deactivate SocketIOServer
+
+    ChatController --> ChatRoutes : 17. Return success
+    deactivate ChatController
+    ChatRoutes --> ChatScreen : 18. Return success
+    deactivate ChatRoutes
+    ChatScreen --> Creator : 19. Show updated chatroom
+    deactivate ChatScreen
+end
+
+@enduml

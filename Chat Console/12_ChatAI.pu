@@ -1,0 +1,49 @@
+@startuml
+' Sequence diagram: Chat AI (Gemini)
+' Flow: FE calls POST /chatAi -> router -> controller -> Gemini API -> return result
+
+title Chat AI
+
+actor User
+participant ChatAIScreen
+participant ChatRouter
+participant ChatController
+participant GeminiAPI
+
+User -> ChatAIScreen : 1. Enter AI message (message)
+activate ChatAIScreen
+ChatAIScreen -> ChatRouter : 2. POST /chatAi (body: message, conversationId)
+activate ChatRouter
+ChatRouter -> ChatController : 3. handleChatAI(req, res)
+activate ChatController
+ChatController -> ChatController : 4. Check if userMessage is missing
+activate ChatController
+deactivate ChatController
+
+alt userMessage is missing
+    ChatController --> ChatRouter : 5.1. Return error (Please enter a message)
+    ChatRouter --> ChatAIScreen : 6.1. Return error
+    ChatAIScreen --> User : 7.1. Show error
+else userMessage exists
+    ChatController -> ChatController : 5. Detect language (VN/EN)
+    activate ChatController
+    deactivate ChatController
+    ChatController -> ChatController : 6. Build Gemini API prompt
+    activate ChatController
+    deactivate ChatController
+    ChatController -> GeminiAPI : 7. Send request to Gemini API
+    activate GeminiAPI
+    GeminiAPI --> ChatController : 8. Receive AI response (reply)
+    deactivate GeminiAPI
+    ChatController -> ChatController : 9. Save conversation history
+    activate ChatController
+    deactivate ChatController
+    ChatController --> ChatRouter : 10. Return reply + conversationId
+    deactivate ChatController
+    ChatRouter --> ChatAIScreen : 11. Return result (reply)
+    deactivate ChatRouter
+    ChatAIScreen --> User : 12. Show AI reply
+    deactivate ChatAIScreen
+end
+
+@enduml

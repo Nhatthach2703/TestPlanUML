@@ -1,0 +1,106 @@
+@startuml
+title Accept/Reject Connection Request
+actor User
+participant ConnectionScreen
+participant ConnectionRouters
+participant AuthMiddleware
+participant ConnectionController
+database Database
+
+User -> ConnectionScreen : 1 : Choose to accept or reject friend request
+activate ConnectionScreen
+
+ConnectionScreen -> ConnectionScreen : 2 : Validate action and fromUserId
+activate ConnectionScreen
+deactivate ConnectionScreen
+alt Invalid action or user
+    ConnectionScreen --> User : 2.1 : Show error message
+else Valid action
+    alt User chooses Accept
+        ConnectionScreen -> ConnectionRouters : 3a : POST request to /connections/accept
+    else User chooses Reject
+        ConnectionScreen -> ConnectionRouters : 3b : POST request to /connections/reject
+    end
+    activate ConnectionRouters
+
+    ConnectionRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> ConnectionRouters : 4.1 : Return unauthorized error
+        ConnectionRouters --> ConnectionScreen : 4.2 : Return status 401
+        ConnectionScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> ConnectionRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        alt Accept Request
+            ConnectionRouters -> ConnectionController : 6a : Call acceptFriendRequest function
+        else Reject Request
+            ConnectionRouters -> ConnectionController : 6b : Call rejectFriendRequest function
+        end
+        activate ConnectionController
+
+        ConnectionController -> ConnectionController : 7 : Validate fromUserId
+        activate ConnectionController
+        deactivate ConnectionController
+
+        alt Invalid fromUserId
+            ConnectionController --> ConnectionRouters : 7.1 : Return 400 error
+            ConnectionRouters --> ConnectionScreen : 7.2 : Return status 400
+            ConnectionScreen --> User : 7.3 : Show "Invalid user" message
+        else Valid fromUserId
+            ConnectionController -> Database : 8 : Find current user and pending connection
+            activate Database
+            Database --> ConnectionController : 9 : Return user with connections
+            deactivate Database
+
+            alt No pending request found
+                ConnectionController --> ConnectionRouters : 9.1 : Return 404 error
+                ConnectionRouters --> ConnectionScreen : 9.2 : Return status 404
+                ConnectionScreen --> User : 9.3 : Show "No pending request" message
+            else Pending request found
+                alt Accept Request
+                    ConnectionController -> Database : 10a : Update connection status to 'accepted'
+                    activate Database
+                    Database --> ConnectionController : 11a : Return updated user
+                    deactivate Database
+
+                    ConnectionController -> Database : 12a : Update or create back connection for fromUser
+                    activate Database
+                    Database --> ConnectionController : 13a : Return updated fromUser
+                    deactivate Database
+
+                    ConnectionController -> ConnectionController : 14a : Create accepted notification
+                    activate ConnectionController
+                    deactivate ConnectionController
+
+                    ConnectionController --> ConnectionRouters : 15a : Return "Friend request accepted" message
+                else Reject Request
+                    ConnectionController -> Database : 10b : Update connection status to 'rejected'
+                    activate Database
+                    Database --> ConnectionController : 11b : Return updated user
+                    deactivate Database
+
+                    ConnectionController -> Database : 12b : Update or create back connection for fromUser
+                    activate Database
+                    Database --> ConnectionController : 13b : Return updated fromUser
+                    deactivate Database
+
+                    ConnectionController -> ConnectionController : 14b : Create rejected notification
+                    activate ConnectionController
+                    deactivate ConnectionController
+
+                    ConnectionController --> ConnectionRouters : 15b : Return "Friend request rejected" message
+                end
+                deactivate ConnectionController
+                ConnectionRouters --> ConnectionScreen : 16 : Return status 200 and response object
+                deactivate ConnectionRouters
+                ConnectionScreen --> User : 17 : Show success message
+                deactivate ConnectionScreen
+            end
+        end
+    end
+end
+
+@enduml

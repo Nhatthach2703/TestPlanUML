@@ -1,0 +1,89 @@
+@startuml
+title Create Travel Info
+actor User
+participant TravelInfoScreen
+participant TravelInfoRouters
+participant AuthMiddleware
+participant AuthorizeMiddleware
+participant TravelInfoController
+database Database
+
+User -> TravelInfoScreen : 1 : Enter travel info (destination, arrivalDate, returnDate)
+activate TravelInfoScreen
+
+TravelInfoScreen -> TravelInfoScreen : 2 : Validate input data
+activate TravelInfoScreen
+deactivate TravelInfoScreen
+
+alt Validate wrong
+    TravelInfoScreen --> User : 2.1 : Show error message
+else Validate right
+    TravelInfoScreen -> TravelInfoRouters : 3 : POST request to /travel-info
+    activate TravelInfoRouters
+
+    TravelInfoRouters -> AuthMiddleware : 4 : Verify JWT token
+    activate AuthMiddleware
+
+    alt Token invalid
+        AuthMiddleware --> TravelInfoRouters : 4.1 : Return unauthorized error
+        TravelInfoRouters --> TravelInfoScreen : 4.2 : Return status 401
+        TravelInfoScreen --> User : 4.3 : Show "Unauthorized" message
+    else Token valid
+        AuthMiddleware --> TravelInfoRouters : 5 : Token verified, pass userId
+        deactivate AuthMiddleware
+
+        TravelInfoRouters -> AuthorizeMiddleware : 6 : Check user role
+        activate AuthorizeMiddleware
+
+        alt Role not authorized
+            AuthorizeMiddleware --> TravelInfoRouters : 6.1 : Return forbidden error
+            TravelInfoRouters --> TravelInfoScreen : 6.2 : Return status 403
+            TravelInfoScreen --> User : 6.3 : Show "Access denied" message
+        else Role authorized (user)
+            AuthorizeMiddleware --> TravelInfoRouters : 7 : Role verified
+            deactivate AuthorizeMiddleware
+
+            TravelInfoRouters -> TravelInfoController : 8 : Call createTravelInfo function
+            activate TravelInfoController
+
+            TravelInfoController -> Database : 9 : Check existing travel info by userId
+            activate Database
+            Database --> TravelInfoController : 10 : Return existing travel info
+            deactivate Database
+
+            alt Travel info already exists
+                TravelInfoController --> TravelInfoRouters : 10.1 : Return 400 error
+                TravelInfoRouters --> TravelInfoScreen : 10.2 : Return status 400
+                TravelInfoScreen --> User : 10.3 : Show "User already has travel info" message
+            else No existing travel info
+                TravelInfoController -> TravelInfoController : 11 : Validate return date > arrival date
+                activate TravelInfoController
+                deactivate TravelInfoController
+
+                alt Date validation failed
+                    TravelInfoController --> TravelInfoRouters : 11.1 : Return 400 error
+                    TravelInfoRouters --> TravelInfoScreen : 11.2 : Return status 400
+                    TravelInfoScreen --> User : 11.3 : Show "Return date must be greater than arrival date" message
+                else Date validation passed
+                    TravelInfoController -> Database : 12 : Create new travel info
+                    activate Database
+                    Database --> TravelInfoController : 13 : Return created travel info
+                    deactivate Database
+
+                    TravelInfoController -> Database : 14 : Update user travelStatus to true
+                    activate Database
+                    Database --> TravelInfoController : 15 : Return updated user
+                    deactivate Database
+
+                    TravelInfoController --> TravelInfoRouters : 16 : Return success message and travel info
+                    deactivate TravelInfoController
+                    TravelInfoRouters --> TravelInfoScreen : 17 : Return status 201 and response object
+                    deactivate TravelInfoRouters
+                    TravelInfoScreen --> User : 18 : Show "Travel info created successfully" message
+                    deactivate TravelInfoScreen
+                end
+            end
+        end
+    end
+end
+@enduml

@@ -1,0 +1,91 @@
+@startuml
+' Add people to chatroom
+' Based on logic in chatController.js, chatUtils.js, chatRouters.js
+' Style referenced from 01_SendMessage2.pu
+
+title Add People Into Chat Room
+
+actor User
+participant ChatScreen
+participant ChatRoutes
+participant ChatController
+participant ChatUtils
+participant SocketIOServer
+Database Database
+
+User -> ChatScreen : 1. Select add people to chatroom and press add
+activate ChatScreen
+ChatScreen -> ChatRoutes : 2. Request POST /:id/add-participant
+activate ChatRoutes
+ChatRoutes -> ChatController : 3. Call function addParticipant
+activate ChatController
+
+ChatController -> Database : 4. Find ChatRoom by ID
+activate Database
+Database --> ChatController : 5. Return ChatRoom result
+deactivate Database
+
+ChatController -> ChatController : 6. Validate chatroom data
+activate ChatController
+deactivate ChatController
+
+ChatController -> ChatController : 7. Check permission (is creator?)
+activate ChatController
+deactivate ChatController
+
+ChatController -> ChatController : 8. Filter new users not in participants
+activate ChatController
+deactivate ChatController
+
+alt ChatRoom not found
+    ChatController --> ChatRoutes : 9.1. Return 404 error
+    ChatRoutes --> ChatScreen : 10.1. Show error "Chat room not found"
+    ChatScreen --> User : 11.1. Show error message
+else No permission
+    ChatController --> ChatRoutes : 9.2. Return 403 error
+    ChatRoutes --> ChatScreen : 10.2. Show error "Only creator can add"
+    ChatScreen --> User : 11.2. Show error message
+else No new users
+    ChatController --> ChatRoutes : 9.3. Return 400 error
+    ChatRoutes --> ChatScreen : 10.3. Show error "All users are already participants"
+    ChatScreen --> User : 11.3. Show error message
+else Success
+    ChatController -> Database : 9. Add new users to participants, save ChatRoom
+    activate Database
+    Database --> ChatController : 10. Return updated ChatRoom
+    deactivate Database
+    ChatController -> Database : 11. Get new users info (fullName)
+    activate Database
+    Database --> ChatController : 12. Return user info
+    deactivate Database
+    ChatController -> ChatUtils : 13. Create system message (userAddedToChatroom/manyUserAddedToChatroom)
+    activate ChatUtils
+    ChatUtils -> Database : 14. Save system message
+    activate Database
+    Database --> ChatUtils : 15. Return system message
+    deactivate Database
+    ChatUtils --> ChatController : 16. Return system message data
+    deactivate ChatUtils
+    ChatController -> SocketIOServer : 17. Emit "newMessage" to chatroom
+    activate SocketIOServer
+    deactivate SocketIOServer
+    ChatController -> ChatUtils : 18. Call emitChatListUpdate
+    activate ChatUtils
+    ChatUtils -> SocketIOServer : 19. Emit "chatListUpdate" to all participants
+    activate SocketIOServer
+    deactivate SocketIOServer
+    deactivate ChatUtils
+    loop for each new user
+        ChatController -> SocketIOServer : 20. Emit "addedToChatRoom" to user
+        activate SocketIOServer
+        deactivate SocketIOServer
+    end
+    ChatController --> ChatRoutes : 21. Return success & updated chatroom
+    deactivate ChatController
+    ChatRoutes --> ChatScreen : 22. Return status 200
+    deactivate ChatRoutes
+    ChatScreen --> User : 23. Show new members in chatroom
+    deactivate ChatScreen
+end
+
+@enduml

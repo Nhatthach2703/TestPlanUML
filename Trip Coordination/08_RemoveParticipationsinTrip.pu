@@ -1,0 +1,55 @@
+@startuml
+' Sequence diagram: Remove Participant from Trip
+' Flow: FE calls DELETE /travelhistory/:id/participants -> router -> controller -> model -> return result
+
+title Remove Participant in Trip
+
+actor User
+participant TripParticipantScreen
+participant travelHistroyRouters
+participant travelHistoryController
+Database Database
+
+User -> TripParticipantScreen : 1. Select participant to remove and press "Remove"
+activate TripParticipantScreen
+TripParticipantScreen -> travelHistroyRouters : 2. DELETE /travelhistory/:id/participants (body: participantId)
+activate travelHistroyRouters
+
+travelHistroyRouters -> travelHistoryController : 3. Call removeParticipant (after authentication, authorization)
+activate travelHistoryController
+
+travelHistoryController -> Database : 4. Find trip by id
+activate Database
+Database --> travelHistoryController : 5. Return trip or null
+deactivate Database
+
+travelHistoryController -> travelHistoryController : 6. Check permission (only creator)
+activate travelHistoryController
+deactivate travelHistoryController
+
+alt If valid
+    travelHistoryController -> travelHistoryController : 7. Check if participant is in trip
+    activate travelHistoryController
+    deactivate travelHistoryController
+
+    alt Participant exists & is not creator
+        travelHistoryController -> Database : 8. Remove participant from trip, save
+        activate Database
+        Database --> travelHistoryController : 9. Return updated trip
+        deactivate Database
+
+        travelHistoryController --> travelHistroyRouters : 10. Return response 200 + updated trip
+    else If participant does not exist or is creator
+        travelHistoryController --> travelHistroyRouters : 8.1. Return error 400
+    end
+else If not valid (not creator/not found trip)
+    travelHistoryController --> travelHistroyRouters : 7.1. Return error 403/404
+    deactivate travelHistoryController
+end
+
+travelHistroyRouters --> TripParticipantScreen : 11. Return result (success/error)
+deactivate travelHistroyRouters
+TripParticipantScreen --> User : 12. Show result (success/failure)
+deactivate TripParticipantScreen
+
+@enduml
